@@ -4,9 +4,11 @@ A cosmetics and stationery storefront built with **Next.js 16 App Router, React 
 
 ## Run locally
 
-Use Node.js 22.18+ (Node 24 recommended).
+Use Node.js 22.18.0 (`.nvmrc`), or a newer compatible runtime meeting `engines.node`.
 
 ```bash
+nvm install
+nvm use
 npm install
 # .env.local is already configured on the original workstation.
 # On another machine, copy .env.example to .env.local and fill in the public values.
@@ -16,6 +18,8 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000).
 
 The project URL and publishable key belong in `.env.local`, which is ignored by Git. Content editing also uses `SUPABASE_SECRET_KEY` on the server; it must never have a `NEXT_PUBLIC_` prefix. No database password is used. Commit `package-lock.json` with the app.
+
+Tailwind v4 runs through `@tailwindcss/postcss` in `postcss.config.mjs`. Next.js handles CSS directly; no custom Turbopack CSS loader is needed. The source stylesheet is `src/app/globals.css`, imported by `src/app/layout.tsx`.
 
 ## Included
 
@@ -192,5 +196,7 @@ The catalog loads up to 1,000 active INR products per request; add server pagina
 ## Deployment
 
 Deploy as a Node-compatible Next.js app, configure the two public Supabase environment variables and server-only `SUPABASE_SECRET_KEY`, verify the database setup, and configure the production auth callback URL. Build with `npm run build` and start with `npm start`. This task creates a local app and does not publish a hosted site.
+
+Configure the host's Node version to 22.18.0 or a newer compatible release. Hosts that offer only major versions should use a current Node 22.x release satisfying `>=22.18.0`. The `.nvmrc` file sets the local nvm version; hosts may require their own dashboard setting. After changing the CSS pipeline, redeploy with the host's build cache cleared if it retains the old loader output.
 
 Implementation references: [Supabase SSR](https://supabase.com/docs/guides/auth/server-side/creating-a-client), [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [Next.js App Router](https://nextjs.org/docs/app), and [Tailwind CSS](https://tailwindcss.com/docs).

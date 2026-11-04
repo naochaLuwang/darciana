@@ -8,15 +8,6 @@ const nextConfig: NextConfig = {
       : 'tsconfig.json',
   },
   experimental: { serverActions: { bodySizeLimit: '6mb' } },
-  /* config options here */
-  turbopack: {
-    rules: {
-      '*.css': {
-        loaders: ['@tailwindcss/turbopack'],
-        as: '*.css',
-      },
-    },
-  },
 };
 
 export default nextConfig;
