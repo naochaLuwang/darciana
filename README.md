@@ -19,7 +19,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 The project URL and publishable key belong in `.env.local`, which is ignored by Git. Content editing also uses `SUPABASE_SECRET_KEY` on the server; it must never have a `NEXT_PUBLIC_` prefix. No database password is used. Commit `package-lock.json` with the app.
 
-Tailwind v4 runs through `@tailwindcss/postcss` in `postcss.config.mjs`. Next.js handles CSS directly; no custom Turbopack CSS loader is needed. The source stylesheet is `src/app/globals.css`, imported by `src/app/layout.tsx`.
+Tailwind v4 runs through the standard `@tailwindcss/postcss` configuration in `postcss.config.mjs`. Both `npm run dev` and `npm run build` explicitly use Next.js's supported `--webpack` option, avoiding the reported Turbopack PostCSS helper-process startup panic. The source stylesheet is `src/app/globals.css`, imported by `src/app/layout.tsx`; admin styles are ordinary CSS in `src/app/admin/admin.css`. No custom CSS loader is configured.
 
 ## Included
 
@@ -197,6 +197,6 @@ The catalog loads up to 1,000 active INR products per request; add server pagina
 
 Deploy as a Node-compatible Next.js app, configure the two public Supabase environment variables and server-only `SUPABASE_SECRET_KEY`, verify the database setup, and configure the production auth callback URL. Build with `npm run build` and start with `npm start`. This task creates a local app and does not publish a hosted site.
 
-Configure the host's Node version to 22.18.0 or a newer compatible release. Hosts that offer only major versions should use a current Node 22.x release satisfying `>=22.18.0`. The `.nvmrc` file sets the local nvm version; hosts may require their own dashboard setting. After changing the CSS pipeline, redeploy with the host's build cache cleared if it retains the old loader output.
+Configure the host's Node version to 22.18.0 or a newer compatible release. Hosts that offer only major versions should use a current Node 22.x release satisfying `>=22.18.0`. The `.nvmrc` file sets the local nvm version; hosts may require their own dashboard setting. Install from the committed lockfile with `npm ci`, and use **`npm run build`** as the deployment build command so the Webpack flag is applied. Clear the host's build cache for the first redeploy after this toolchain change. `.next` and `node_modules` are ignored generated directories; do not include them in source uploads.
 
 Implementation references: [Supabase SSR](https://supabase.com/docs/guides/auth/server-side/creating-a-client), [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [Next.js App Router](https://nextjs.org/docs/app), and [Tailwind CSS](https://tailwindcss.com/docs).
