@@ -1,8 +1,17 @@
 // Inject the client factory so authorization and deletion can be tested locally
 // without a service key or a connection to the live project.
+import { corsHeaders } from '@supabase/supabase-js/cors';
+
 export function createDeleteAccountHandler({ createClient, url, publicKey, secretKey }) {
-  const reply = (status, body) => Response.json(body, { status });
+  // Native WebViews send authenticated requests directly, without the web server.
+  // CORS grants no authority: every deletion still verifies the caller and proof.
+  const headers = {
+    ...corsHeaders,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+  const reply = (status, body) => Response.json(body, { status, headers });
   return async function handle(request) {
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     if (request.method !== 'POST') return reply(405, { error: 'Method not allowed.' });
     if (!url || !publicKey || !secretKey)
       return reply(503, { error: 'Account deletion is unavailable. Try again later.' });
@@ -16,21 +25,41 @@ export function createDeleteAccountHandler({ createClient, url, publicKey, secre
       if (error || !user?.email)
         return reply(401, { error: 'Sign in again to delete your account.' });
       const body = await request.json().catch(() => null);
-      if (
-        body?.confirmation !== 'DELETE' ||
-        typeof body?.password !== 'string' ||
-        !body.password ||
-        body.password.length > 128
-      )
+      if (body?.confirmation !== 'DELETE')
         return reply(400, { error: 'Enter your password and type DELETE to confirm.' });
-      // Verify this account's password. Never accept an email or user ID from
-      // the request body as the deletion target.
-      const verified = await client.auth.signInWithPassword({
-        email: user.email,
-        password: body.password,
-      });
-      if (verified.error || verified.data?.user?.id !== user.id)
-        return reply(400, { error: 'Incorrect password. Your account was not deleted.' });
+      if (body.reauthentication === 'google') {
+        // Verify signed claims, not decoded browser input or user_metadata.
+        // A refreshed token's iat is insufficient: require a recent OAuth AMR.
+        const verified = await client.auth.getClaims(token);
+        const claims = verified.data?.claims;
+        const now = Math.floor(Date.now() / 1000);
+        const google =
+          user.app_metadata?.provider === 'google' ||
+          user.app_metadata?.providers?.includes('google');
+        const recentOAuth =
+          Array.isArray(claims?.amr) &&
+          claims.amr.some(
+            (method) =>
+              method.method === 'oauth' &&
+              Number.isInteger(method.timestamp) &&
+              method.timestamp <= now + 30 &&
+              method.timestamp >= now - 300,
+          );
+        if (verified.error || claims?.sub !== user.id || !google || !recentOAuth)
+          return reply(400, {
+            error: 'Confirm again with your Google account. Your account was not deleted.',
+          });
+      } else {
+        if (typeof body.password !== 'string' || !body.password || body.password.length > 128)
+          return reply(400, { error: 'Enter your password and type DELETE to confirm.' });
+        // Never accept an email or user ID from the request as the deletion target.
+        const verified = await client.auth.signInWithPassword({
+          email: user.email,
+          password: body.password,
+        });
+        if (verified.error || verified.data?.user?.id !== user.id)
+          return reply(400, { error: 'Incorrect password. Your account was not deleted.' });
+      }
       const admin = createClient(url, secretKey, options);
       const revoked = await admin.auth.admin.signOut(token, 'global');
       if (revoked.error)

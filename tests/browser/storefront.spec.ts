@@ -4,7 +4,7 @@ test('homepage loads the live catalog and renders on desktop and mobile', async 
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await visit(page, '/');
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Beauty &');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Hello there');
   await expect(page.locator('.product-card').first()).toBeVisible();
   await page.locator('.product-card').last().scrollIntoViewIfNeeded();
   await page.waitForFunction(() =>

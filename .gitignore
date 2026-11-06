@@ -1,7 +1,5 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -10,38 +8,86 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
-
-# next.js
-/.next/
-/.next-admin-tests/
+# generated web builds
+/.next*/
 /out/
+/build/
+/dist/
+/mobile/dist/
 
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-!.env.example
-
-# Browser test artifacts
-/test-results/
-/playwright-report/
-
-# vercel
-.vercel
-
-# typescript
+# build and tooling caches
+.vite/
+.turbo/
+.cache/
+.eslintcache
 *.tsbuildinfo
 next-env.d.ts
+
+# generated Android builds and local SDK settings
+.gradle/
+.kotlin/
+.cxx/
+.externalNativeBuild/
+/android/**/build/
+local.properties
+/android/captures/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.hprof
+
+# signing keys and private certificates
+*.keystore
+*.jks
+*.p12
+*.pfx
+*.pem
+*.key
+
+# credentials (keep the safe setup template)
+.env*
+!.env.example
+/.aws/
+
+# local IDE and agent settings
+.idea/
+.vscode/
+*.iml
+*.code-workspace
+/.codex/
+/.agents/
+
+# temporary files and editor backups
+/tmp/
+/temp/
+*.tmp
+*.bak
+*.orig
+*.swp
+*.swo
+*~
+
+# OS metadata
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+
+# test reports, APK deliveries and visual previews
+/coverage/
+/test-results/
+/playwright-report/
+/playwright/.cache/
+/blob-report/
+/artifacts/
+/assets/*-preview.png
+
+# logs
+*.log
+
+# local deployment and Supabase CLI state
+.vercel/
+.netlify/
+/supabase/.temp/
+/supabase/.branches/

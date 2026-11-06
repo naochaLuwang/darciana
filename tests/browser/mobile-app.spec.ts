@@ -26,17 +26,81 @@ test('bottom tabs navigate through app screens and reflect the active screen', a
     'page',
   );
   await nav.getByRole('link', { name: 'More', exact: true }).click();
+  await expect(nav.getByRole('link')).toHaveText([
+    'Home',
+    'Categories',
+    'Saved',
+    'Profile',
+    'More',
+  ]);
+  await expect(nav.getByRole('link', { name: 'More', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
   await expect(page.getByRole('heading', { name: 'Support & info', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Legal', exact: true })).toBeVisible();
   await expect(nav.getByRole('link', { name: 'Bag', exact: true })).toHaveCount(0);
   await page.getByRole('link', { name: /Shopping bag/ }).click();
   await expect(page.getByRole('heading', { name: 'Your bag is empty' })).toBeVisible();
-  await nav.getByRole('link', { name: 'Account', exact: true }).click();
+  await nav.getByRole('link', { name: 'Profile', exact: true }).click();
   await expect(page.getByLabel('Email address')).toBeVisible();
-  await expect(nav.getByRole('link', { name: 'Account', exact: true })).toHaveAttribute(
+  await expect(nav.getByRole('link', { name: 'Profile', exact: true })).toHaveAttribute(
     'aria-current',
     'page',
   );
+});
+
+test('More shares the store, handles clipboard fallback and fits small screens', async ({
+  page,
+}) => {
+  await visit(page, '/more');
+  await expect(page.getByText('Designed & developed by')).toBeVisible();
+  await expect(page.getByText('Luwang Tech', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^Version \d+\.\d+\.\d+/)).toBeVisible();
+  for (const width of [320, 390, 1024]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({ path: `test-results/more-${width}.png`, fullPage: true });
+  }
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: async (data: ShareData) => {
+        Reflect.set(window, '__sharedStore', data);
+      },
+    });
+  });
+  const share = page.getByRole('button', { name: 'Share app', exact: true });
+  await share.click();
+  const expectedUrl = new URL('/', page.url()).href;
+  await expect
+    .poll(() => page.evaluate(() => Reflect.get(window, '__sharedStore')))
+    .toEqual({
+      title: 'Darciana',
+      url: expectedUrl,
+    });
+  await expect(share).toBeEnabled();
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          Reflect.set(window, '__copiedStore', text);
+        },
+      },
+    });
+  });
+  await share.click();
+  await expect(page.getByText('Link copied', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => Reflect.get(window, '__copiedStore'))).toBe(expectedUrl);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+  });
+  await share.click();
+  await expect(page.getByLabel('Store link')).toHaveValue(expectedUrl);
 });
 
 test('purchase and checkout controls stay above tabs and simulated device safe areas', async ({

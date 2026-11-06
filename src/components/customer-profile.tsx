@@ -1,5 +1,6 @@
 'use client';
 import { useState, useTransition } from 'react';
+import { UserRound } from 'lucide-react';
 import { saveProfile } from '@/app/account/actions';
 import type { CustomerProfile as Profile } from '@/lib/profile-server';
 export function CustomerProfile({
@@ -15,8 +16,13 @@ export function CustomerProfile({
   const [message, setMessage] = useState('');
   const [saveError, setSaveError] = useState('');
   return (
-    <section className="account-panel" aria-labelledby="customer-profile-title">
-      <h2 id="customer-profile-title">{profile ? 'Profile' : 'Complete your profile'}</h2>
+    <section className="account-panel account-details" aria-labelledby="customer-profile-title">
+      <div className="account-section-heading">
+        <UserRound size={18} aria-hidden="true" />
+        <h2 id="customer-profile-title">
+          {profile ? 'Personal details' : 'Complete your profile'}
+        </h2>
+      </div>
       {error ? (
         <p className="notice" role="status">
           {error}

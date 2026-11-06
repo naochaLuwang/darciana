@@ -14,14 +14,16 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: { default: 'Darciana — Cosmetics & stationery', template: '%s | Darciana' },
-  description: 'Shop cosmetics, skincare, and stationery at Darciana.',
+  title: { default: 'Daciana — Cosmetics & stationery', template: '%s | Daciana' },
+  description: 'Shop cosmetics, skincare, and stationery at Daciana.',
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { products } = await getCatalog();
   return (
-    <html lang="en">
+    // Recorder extensions can add root attributes before hydration. Keep the
+    // exception on html so descendants retain normal hydration checks.
+    <html lang="en" suppressHydrationWarning>
       <body>
         <ShopProvider products={products.map((product) => ({ ...product, description: null }))}>
           <a className="skip-link" href="#main">

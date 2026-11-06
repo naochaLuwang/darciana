@@ -1,4 +1,4 @@
-# Darciana
+# Daciana
 
 A cosmetics and stationery storefront built with **Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4, and Supabase**. Prices are in INR.
 
@@ -23,7 +23,7 @@ Tailwind v4 runs through the standard `@tailwindcss/postcss` configuration in `p
 
 ## Included
 
-- Mobile app layout with persistent Home, Categories, Saved, More, and Account tabs. The shopping bag is accessible from the header.
+- Mobile app layout with persistent Home, Categories, Saved, Profile, and More tabs. The shopping bag is accessible from the header.
 - Compact home feed, collection shortcuts, custom illustrations, and touch-friendly product grids.
 - Dedicated category and saved-item screens, collapsible filters, and route-aware app headers.
 - Fixed product purchase and bag checkout controls on phones, above the navigation tabs.
@@ -32,6 +32,7 @@ Tailwind v4 runs through the standard `@tailwindcss/postcss` configuration in `p
 - Search by name or brand, category filters with nested categories, sorting, and in-stock filtering.
 - Favourites and shopping bag saved in browser local storage; quantities and totals use the current catalog rather than saved prices.
 - Email/password sign-up and sign-in, confirmation callback, cookie session refresh, and sign-out.
+- Google sign-in through Supabase PKCE on web and Android; see the [Google setup walkthrough](docs/google-sign-in.md).
 - India delivery form, validated order requests, confirmation screen, and account order history.
 - Protected `/admin` store console with product/option editing, image uploads, stock updates, categories, order-request review, and an activity history.
 - Shipping area names and INR delivery prices in admin, with a searchable area dropdown and delivery-inclusive totals at checkout.
@@ -85,7 +86,7 @@ The database validates the selected active area and recalculates the item and de
 
 For a new project, run [`supabase/profile-setup.sql`](supabase/profile-setup.sql) once after the existing order/admin/shipping/address scripts. It adds a separate name/phone profile and an address book, migrates existing single saved addresses, and archives additional delivery addresses without rewriting order snapshots. These tables and RPCs were found in the current live project. RLS limits profiles and addresses to their owner; store admin membership does not reveal other customers’ saved profiles.
 
-**Account** shows **Complete your profile** until the customer saves their name and phone, then **Update profile**. **Saved addresses** opens `/account/addresses`, where customers add and edit multiple addresses. Profile contact details prefill new address forms. Checkout lists the saved addresses and reuses the selected recipient/address. Saving or submitting a different address retains the previous ones. Repeated identical saves do not add duplicates, and editing a saved address retains its ID. Delivery notes remain order-specific. The older single-address table remains compatible with existing checkout clients and is still used for the most recent delivery address.
+**Profile** shows **Complete your profile** until the customer saves their name and phone, then **Update profile**. **Saved addresses** opens `/account/addresses`, where customers add and edit multiple addresses. Profile contact details prefill new address forms. Checkout lists the saved addresses and reuses the selected recipient/address. Saving or submitting a different address retains the previous ones. Repeated identical saves do not add duplicates, and editing a saved address retains its ID. Delivery notes remain order-specific. The older single-address table remains compatible with existing checkout clients and is still used for the most recent delivery address.
 
 **Delete account** asks for the current password and the word `DELETE`. The private data and order-history consequences are shown before the destructive button. To enable live deletion, deploy the complete [`supabase/functions/delete-account`](supabase/functions/delete-account) directory as the `delete-account` Supabase Edge Function. Include `index.ts`, `handler.mjs`, and `deno.json`, and leave **Verify JWT** enabled. The function verifies the user with Supabase Auth, rechecks that account’s password, revokes all sessions, and calls the server-only Auth deletion API for the authenticated ID. Supabase injects its API keys into the Edge runtime; no admin key belongs in Next.js public environment variables. See [Edge Function auth](https://supabase.com/docs/guides/functions/auth), [environment variables](https://supabase.com/docs/guides/functions/secrets), and [Auth user deletion](https://supabase.com/docs/guides/auth/managing-user-data#deleting-users).
 
@@ -97,9 +98,11 @@ The Edge entry point targets Deno; this machine does not have the Deno CLI, so i
 
 Customer screens use short headings and direct actions. Repeated promotional slogans, duplicate bag totals, and redundant explanatory paragraphs were removed. Product descriptions expand under **Product details**; empty saved lists hide unused search/filter controls. Prices, stock, shipping fees, pending confirmation, and checkout terms remain visible where needed.
 
+The account screen uses a branded sign-in panel with Google/email access, a password visibility control, and a simple sign-in/create-account switch. Signed-in customers see their profile identity, contact form, saved-address link, order cards, and a separate sign-out row with pending feedback. Name and phone fields stack on phones; account deletion keeps its existing explicit confirmation.
+
 ## More and content management
 
-**More** replaces the bag tab and groups links under **Support & info** and **Legal**. It reads the existing public `site_settings` table. The live `privacy_policy`, `return_policy`, and `terms_and_conditions` rows are reused without changing their text. Support pages appear once an administrator adds their content; no contact details or policies are invented.
+**More** sits at the far right after **Profile**, with links grouped under **Support & info** and **Legal**. It reads the existing public `site_settings` table. The live `privacy_policy`, `return_policy`, and `terms_and_conditions` rows are reused without changing their text. Support pages appear once an administrator adds their content; no contact details or policies are invented. A compact brand card, **Share app** action, and footer complete the screen. Sharing opens the device share sheet where available, otherwise copies the store link or displays it for manual copying. The footer reads the current version from `package.json` and credits **Luwang Tech**.
 
 Open **Admin → More content** (`/admin/content`) to edit a page or add one. Set its title, section, numeric position, plain-text content, and **Show in More** setting. Lower positions appear first. Saving updates the storefront; hiding removes its link and app page. Hidden content remains in the publicly readable table, so this is not private draft storage. Page text is escaped rather than rendered as HTML.
 
@@ -113,11 +116,11 @@ For a new project, run [`supabase/checkout-setup.sql`](supabase/checkout-setup.s
 
 Checkout is a compact column: **Shipping info**, tappable **Delivery location**, searchable **Shipping area**, **Price details**, **Select payment mode**, terms checkbox, and **Confirm and order**. The address form and terms open in modal sheets. Confirmation requires an address, an active area, an available bag, COD selection, and accepted terms. Orders remain requests awaiting store confirmation without collecting money or reserving inventory. Idempotent retries return the original saved mode and totals.
 
-## Mobile UI and Capacitor
+## Android app with Capacitor
 
-The UI uses `viewport-fit=cover`, safe-area insets on all four edges, a sticky app header, 44px touch controls, and 16px form inputs. Tab and purchase bars reserve space in the page so the last item remains reachable. The tabs hide when a focused field and a reduced visual viewport indicate an onscreen keyboard. Keyboard behaviour and system insets still need verification on actual iOS/Android devices when the native shell is added; Capacitor Keyboard events can be connected to `ViewportBehavior` for native-specific resizing modes.
+The Android app is **Daciana**, application ID **com.luwangtech.daciana**. Its customer UI is bundled locally with Capacitor 8. The Next.js website and admin remain available separately. Native features include Android Back, safe areas, keyboard handling, encrypted session storage, Google OAuth return links, connectivity feedback and the share sheet.
 
-This change redesigns the UI; it does not install Capacitor, create native projects, or configure signing, app links, native back handling, or publishing. The app currently uses Next.js server rendering, cookie auth, and Server Actions. A bundled Capacitor `webDir` needs static web assets, so packaging will also require separating those server dependencies from the bundled client or selecting another supported architecture. Setting `output: 'export'` alone will not convert the current server features. See [Next.js static export limitations](https://nextjs.org/docs/app/guides/static-exports#unsupported-features), [Capacitor configuration](https://capacitorjs.com/docs/config), and [Capacitor Keyboard](https://capacitorjs.com/docs/apis/keyboard).
+Run `npm run android:debug` to build `artifacts/daciana-debug.apk`, or `npm run android:bundle` for a release App Bundle. See the [Android setup and release guide](docs/android-app.md) for SDK requirements, the Supabase redirect URL, account-deletion deployment, signing and installation. Mobile integration tests use `npm run test:mobile-ui`.
 
 ## Live checkout verification
 

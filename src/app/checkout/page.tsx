@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ArrowLeft, ArrowRight, ShoppingBag, UserRound } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { CheckoutForm } from '@/components/checkout-form';
 import { getDeliveryAreas } from '@/lib/shipping-server';
@@ -11,14 +12,25 @@ export default async function CheckoutPage() {
   const user = supabase ? (await supabase.auth.getUser()).data.user : null;
   if (!user)
     return (
-      <main id="main" className="page-width empty-state">
-        <h1>Sign in to checkout</h1>
-        <Link className="button button-dark" href="/account?next=checkout">
-          Sign in →
-        </Link>
-        <Link className="text-link" href="/bag">
-          Back to bag
-        </Link>
+      <main id="main" className="page-width checkout-signin-page">
+        <div className="checkout-signin-card">
+          <div className="checkout-signin-art" aria-hidden="true">
+            <ShoppingBag size={42} strokeWidth={1.35} />
+            <span>
+              <UserRound size={17} strokeWidth={1.7} />
+            </span>
+          </div>
+          <h1>Sign in to checkout</h1>
+          <p>Your items stay in your bag.</p>
+          <div className="checkout-signin-actions">
+            <Link className="button button-dark" href="/account?next=checkout">
+              Sign in <ArrowRight size={18} aria-hidden="true" />
+            </Link>
+            <Link className="button checkout-signin-back" href="/bag">
+              <ArrowLeft size={17} aria-hidden="true" /> Back to bag
+            </Link>
+          </div>
+        </div>
       </main>
     );
   const [delivery, profile, personal] = await Promise.all([

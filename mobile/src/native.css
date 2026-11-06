@@ -1,0 +1,40 @@
+html,
+body {
+  overscroll-behavior-y: none;
+}
+body {
+  min-width: 280px;
+}
+.native-offline {
+  padding: 10px max(20px, env(safe-area-inset-right, 0px));
+  background: #fae9ef;
+  color: #673944;
+  font-size: 12px;
+  text-align: center;
+}
+.native-notice {
+  position: fixed;
+  left: max(16px, env(safe-area-inset-left, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(var(--dock-bottom) + 16px);
+  z-index: 100;
+  padding: 16px;
+  background: var(--ink);
+  color: white;
+  border-radius: 16px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.native-notice button {
+  min-height: 44px;
+  margin-left: 12px;
+  background: none;
+  border: 0;
+  color: white;
+  text-decoration: underline;
+}
+.native-signout-retry {
+  border: 0;
+  background: none;
+  min-height: 44px;
+}

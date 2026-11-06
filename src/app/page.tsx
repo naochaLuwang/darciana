@@ -3,9 +3,22 @@ import { ArrowRight, Search, Sparkles, Flower2, BookOpen, Grid2X2 } from 'lucide
 import { getCatalog } from '@/lib/catalog';
 import { ProductCard } from '@/components/product-card';
 import { categoryTreeIds, type Product } from '@/lib/commerce';
+import { createClient } from '@/lib/supabase/server';
+import { getCustomerProfile } from '@/lib/profile-server';
+
+async function getCustomerName() {
+  const db = await createClient();
+  const user = db ? (await db.auth.getUser()).data.user : null;
+  if (!db || !user) return '';
+  const { profile } = await getCustomerProfile(db, user.id);
+  return profile?.name.trim() ?? '';
+}
 
 export default async function Home() {
-  const { products, categories, error } = await getCatalog();
+  const [{ products, categories, error }, name] = await Promise.all([
+    getCatalog(),
+    getCustomerName(),
+  ]);
   const ordered = [...products]
     .sort(
       (a, b) =>
@@ -41,7 +54,13 @@ export default async function Home() {
       <div className="home-welcome">
         <div>
           <h1>
-            Beauty & <em>stationery</em>
+            {name ? (
+              <>
+                Hello, <em>{name}</em>
+              </>
+            ) : (
+              'Hello there'
+            )}
           </h1>
         </div>
         <Flower2 size={29} strokeWidth={1.4} />
@@ -92,7 +111,7 @@ export default async function Home() {
           <div className="campaign-lipstick">
             <span />
             <div />
-            <small>darciana</small>
+            <small>daciana</small>
           </div>
           <Flower2 className="campaign-flower" size={33} strokeWidth={1.1} />
         </div>

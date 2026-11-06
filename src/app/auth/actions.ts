@@ -1,9 +1,41 @@
 'use server';
-import { headers } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
+import { oauthDestinationCookie } from '@/lib/auth-navigation';
 export type AuthState = { error?: string; message?: string };
+export async function signInWithGoogle(_: AuthState, form: FormData): Promise<AuthState> {
+  const supabase = await createClient();
+  if (!supabase) return { error: 'Account access is unavailable. Please try again later.' };
+  const origin = (await headers()).get('origin');
+  if (!origin) return { error: 'Refresh the page and try again.' };
+  const callback = new URL('/auth/callback', origin);
+  if (!['http:', 'https:'].includes(callback.protocol))
+    return { error: 'Refresh the page and try again.' };
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: callback.toString(),
+      queryParams: { prompt: 'select_account' },
+    },
+  });
+  if (error || !data.url) return { error: 'Google sign-in could not start. Please try again.' };
+  const cookieStore = await cookies();
+  cookieStore.set(
+    oauthDestinationCookie,
+    form.get('next') === 'checkout' ? 'checkout' : 'account',
+    {
+      httpOnly: true,
+      secure: callback.protocol === 'https:',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 600,
+    },
+  );
+  redirect(data.url);
+}
+
 const credentials = z.object({
   email: z.email().max(254),
   password: z.string().min(1, 'Enter your password.').max(128),

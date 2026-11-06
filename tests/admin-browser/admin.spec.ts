@@ -23,6 +23,82 @@ async function signIn(context: BrowserContext, id: string) {
 test.beforeEach(async ({ request }) => {
   await request.get('http://127.0.0.1:54329/__reset');
 });
+test('account screens support password visibility, email sign-in and sign-out on a phone', async ({
+  page,
+  context,
+}) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.goto('/account');
+  await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Continue with Google', exact: true }),
+  ).toBeVisible();
+  await page.getByLabel('Email address', { exact: true }).fill('customer@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('test-password');
+  await page.getByRole('button', { name: 'Show password', exact: true }).click();
+  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'text');
+  await page.getByRole('button', { name: 'Hide password', exact: true }).click();
+  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'password');
+  await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Create account', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/account-sign-in-mobile.png', fullPage: true });
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'My account', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Saved addresses', exact: true })).toBeVisible();
+  await page.getByRole('heading', { name: 'Orders', exact: true }).scrollIntoViewIfNeeded();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: 'test-results/account-profile-mobile.png', fullPage: true });
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
+  expect(
+    (await context.cookies()).some((cookie) => cookie.name.startsWith('sb-127-auth-token')),
+  ).toBe(false);
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Hello there', exact: true })).toBeVisible();
+});
+
+test('Google sign-in exchanges PKCE cookies, returns to checkout and handles cancellation', async ({
+  page,
+  context,
+  request,
+}) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.goto('/product/rose-lip-tint');
+  await page.getByRole('button', { name: 'Add to bag', exact: true }).click();
+  await expect(page.getByRole('link', { name: /Shopping bag/ })).toContainText('1');
+  await page.goto('/account?next=checkout');
+  await page.getByRole('button', { name: 'Continue with Google', exact: true }).click();
+  await expect(page).toHaveURL('http://127.0.0.1:3002/checkout');
+  await expect(page.getByRole('heading', { name: 'Shipping info', exact: true })).toBeVisible();
+  expect((await context.cookies()).some((cookie) => cookie.name === 'darciana.oauth-next')).toBe(
+    false,
+  );
+  await context.clearCookies();
+  await page.goto('/account');
+  await page.getByRole('button', { name: 'Create account', exact: true }).first().click();
+  await expect(
+    page.getByRole('button', { name: 'Continue with Google', exact: true }),
+  ).toBeVisible();
+  await page.screenshot({ path: 'test-results/google-sign-in-mobile.png', fullPage: true });
+  await page.getByRole('button', { name: 'Continue with Google', exact: true }).click();
+  await expect(page).toHaveURL('http://127.0.0.1:3002/account');
+  await expect(page.getByRole('heading', { name: 'My account', exact: true })).toBeVisible();
+  await context.clearCookies();
+  await request.get('http://127.0.0.1:54329/__oauth/deny');
+  await page.goto('/account');
+  await page.getByRole('button', { name: 'Continue with Google', exact: true }).click();
+  await expect(
+    page.getByText('Google sign-in wasn’t completed. Please try again.', { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Email address', { exact: true })).toBeVisible();
+  expect((await context.cookies()).some((cookie) => cookie.name === 'darciana.oauth-next')).toBe(
+    false,
+  );
+});
+
 test('signed-out and customer accounts cannot see admin data', async ({ page, context }) => {
   await page.goto('/admin');
   await expect(page.getByRole('button', { name: 'Sign in to admin' })).toBeVisible();
@@ -190,6 +266,8 @@ test('profile updates and multiple saved addresses are private and reusable at c
   page,
   context,
 }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Hello there', exact: true })).toBeVisible();
   await signIn(context, CUSTOMER);
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto('/account');
@@ -199,6 +277,16 @@ test('profile updates and multiple saved addresses are private and reusable at c
   await expect(page.getByText('Profile updated.', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Update profile', exact: true })).toBeVisible();
   await page.screenshot({ path: 'test-results/customer-profile-mobile.png', fullPage: true });
+  await page.goto('/');
+  await expect(
+    page.getByRole('heading', { name: 'Hello, Profile Customer', exact: true }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/home-personalized-mobile.png', fullPage: true });
+  await page
+    .getByRole('navigation', { name: 'App navigation' })
+    .getByRole('link', { name: 'Profile', exact: true })
+    .click();
   await page.getByRole('link', { name: /Saved addresses/ }).click();
   await page.getByRole('button', { name: 'Add new address', exact: true }).click();
   await expect(page.getByLabel('Full name', { exact: true })).toHaveValue('Profile Customer');
@@ -243,6 +331,8 @@ test('profile updates and multiple saved addresses are private and reusable at c
   await expect(page.locator('.address-book-card')).toHaveCount(0);
   await page.goto('/account');
   await expect(page.getByLabel('Full name', { exact: true })).toHaveValue('');
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Hello there', exact: true })).toBeVisible();
 });
 
 test('checkout can save without submitting, preserves failed edits and rejects a disabled saved area', async ({
@@ -416,6 +506,36 @@ test('profile deletion requires explicit confirmation and the current password',
   await remove.click();
   await expect(page.getByText('Account deleted.', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
+});
+
+test('recorder attributes on html do not trigger a hydration warning', async ({ page }) => {
+  const hydrationErrors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error' && /hydrat|didn.t match/i.test(message.text()))
+      hydrationErrors.push(message.text());
+  });
+  await page.addInitScript(() => {
+    const decorate = () => {
+      if (!document.documentElement) return false;
+      document.documentElement.setAttribute('data-scribe-recorder-ready', 'true');
+      return true;
+    };
+    if (!decorate()) {
+      const observer = new MutationObserver(() => {
+        if (decorate()) observer.disconnect();
+      });
+      observer.observe(document, { childList: true });
+    }
+  });
+  await page.goto('/');
+  await expect(page.locator('html')).toHaveAttribute('data-keyboard', 'closed');
+  await expect(page.locator('html')).toHaveAttribute('data-scribe-recorder-ready', 'true');
+  await page
+    .getByRole('navigation', { name: 'App navigation' })
+    .getByRole('link', { name: 'More', exact: true })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Legal', exact: true })).toBeVisible();
+  expect(hydrationErrors).toEqual([]);
 });
 
 test('More reuses legal content and admin changes reach customers without exposing the server key', async ({

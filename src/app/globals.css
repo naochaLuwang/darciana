@@ -220,6 +220,26 @@ h3 {
 .app-topbar-title {
   min-width: 0;
 }
+.app-topbar-actions {
+  flex-shrink: 0;
+}
+.header-logo {
+  display: block;
+  position: relative;
+  width: 212px;
+  max-width: 100%;
+  aspect-ratio: 4.5;
+  overflow: hidden;
+}
+.header-logo img {
+  /* Frame the supplied artwork without its large outer margins. */
+  position: absolute;
+  width: 140.8%;
+  max-width: none;
+  height: auto;
+  left: -20.64%;
+  top: -110.72%;
+}
 .wordmark {
   font:
     bold 32px/1 Georgia,
@@ -383,17 +403,21 @@ html[data-keyboard='open'] .app-content {
   font-size: 8px;
   letter-spacing: 1px;
 }
+.home-welcome > div {
+  min-width: 0;
+}
 .home-welcome h1 {
   font-size: clamp(21px, 5.7vw, 27px);
   letter-spacing: -0.9px;
   margin-top: 5px;
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 .home-welcome h1 em {
   font-family: Georgia, serif;
   color: var(--purple);
   font-weight: 400;
-  white-space: nowrap;
+  white-space: normal;
   margin-left: 0.12em;
 }
 .home-welcome > svg {
@@ -1402,45 +1426,114 @@ body:has(.bag-checkout-dock) .app-content {
   padding-inline: 15px;
 }
 .auth-page {
-  padding-top: 26px;
-  max-width: 460px;
-}
-.auth-decoration {
-  display: none;
+  padding-top: 24px;
+  max-width: 480px;
 }
 .auth-card {
-  padding: 24px 21px;
+  min-width: 0;
+}
+.auth-intro {
+  text-align: center;
+  margin-bottom: 24px;
+}
+.auth-brand {
+  display: inline-block;
+  font-size: 30px;
+}
+.auth-intro h1 {
+  font-size: 28px;
+  margin-top: 22px;
+  letter-spacing: -0.8px;
+}
+.auth-intro p {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.auth-form-panel {
+  padding: 22px;
   background: white;
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 22px;
 }
-.auth-card h1 {
-  font-size: 26px;
-  margin: 0;
+.auth-form-panel .form-stack label {
+  font-size: 12px;
 }
-.auth-card > p {
+.auth-form-panel .form-stack > .button {
+  width: 100%;
+  font-size: 14px;
+}
+.auth-password-control {
+  position: relative;
+  margin-top: 8px;
+}
+.auth-form-panel .auth-password-control input {
+  margin-top: 0;
+  padding-right: 50px;
+}
+.auth-password-control .icon-button {
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+}
+.auth-switch {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
   font-size: 12px;
   color: var(--muted);
 }
-.auth-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  background: var(--paper);
-  border-radius: 12px;
-  padding: 4px;
-  margin: 18px 0;
-}
-.auth-tabs button {
+.auth-switch .text-link {
   min-height: 44px;
-  background: none;
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
   border: 0;
-  border-radius: 10px;
-  font-size: 11px;
-}
-.auth-tabs button.selected {
-  background: white;
   color: var(--purple);
-  box-shadow: 0 2px 6px #35263f08;
+  font-size: 12px;
+  font-weight: 600;
+}
+.auth-page > div > .notice,
+.auth-page > div > .form-success {
+  margin-bottom: 20px;
+}
+.google-sign-in {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #747775;
+  background: white;
+  color: #1f1f1f;
+  font-size: 14px;
+  font-weight: 500;
+}
+.google-sign-in:hover:not(:disabled) {
+  background: #f8f9fa;
+}
+.google-sign-in > svg {
+  flex-shrink: 0;
+}
+.google-sign-in-form .form-error {
+  margin-top: 12px;
+}
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 20px 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
 }
 .form-stack {
   display: flex;
@@ -1719,6 +1812,73 @@ body:has(.bag-checkout-dock) .app-content {
   max-width: 640px;
   padding-top: 16px;
   padding-bottom: 24px;
+}
+.checkout-signin-page {
+  max-width: 480px;
+  min-height: calc(100svh - 64px - var(--safe-top) - var(--dock-bottom) - 26px);
+  padding-block: 24px;
+  display: grid;
+  align-items: center;
+}
+.checkout-signin-card {
+  padding: 32px 24px 24px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: white;
+  text-align: center;
+}
+.checkout-signin-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  margin: 0 auto 26px;
+  border-radius: 26px;
+  background: var(--lilac);
+  color: var(--purple);
+}
+.checkout-signin-art > span {
+  position: absolute;
+  right: -7px;
+  bottom: -5px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 3px solid white;
+  border-radius: 50%;
+  background: var(--blush);
+}
+.checkout-signin-card h1 {
+  max-width: 260px;
+  margin-inline: auto;
+  font-size: 28px;
+  letter-spacing: -0.8px;
+  text-wrap: balance;
+}
+.checkout-signin-card > p {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.checkout-signin-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 28px;
+}
+.checkout-signin-actions .button {
+  min-height: 50px;
+  font-size: 14px;
+}
+.checkout-signin-back {
+  background: var(--paper);
+  color: var(--muted);
+}
+.checkout-signin-back:hover {
+  background: var(--lilac);
+  color: var(--ink);
 }
 .compact-checkout {
   display: grid;
@@ -2022,6 +2182,9 @@ html:has(.checkout-sheet[open]) {
   .wordmark {
     font-size: 36px;
   }
+  .header-logo {
+    width: 252px;
+  }
   .topbar-greeting {
     display: block;
     font-size: 11px;
@@ -2169,9 +2332,6 @@ html:has(.checkout-sheet[open]) {
   }
   .auth-page {
     padding-top: 35px;
-  }
-  .auth-card {
-    padding: 35px;
   }
   .form-grid {
     gap: 24px;
@@ -2636,15 +2796,13 @@ html:has(.checkout-sheet[open]) {
 }
 
 .account-panel {
-  padding: 20px;
-  margin-top: 20px;
+  padding: 22px;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 20px;
   background: white;
 }
 .account-panel h2 {
-  font-size: 18px;
-  margin-bottom: 18px;
+  font-size: 16px;
 }
 .account-panel .form-error,
 .account-panel .form-success {
@@ -2654,20 +2812,198 @@ html:has(.checkout-sheet[open]) {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 18px 20px;
-  margin-top: 16px;
-  min-height: 60px;
-  background: white;
-  border: 1px solid var(--line);
-  border-radius: 16px;
+  padding: 14px 16px;
+  min-height: 64px;
   font-size: 14px;
 }
-.account-menu-row > span:first-of-type {
+.account-menu-label {
   flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .account-menu-row > svg {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.account-page {
+  max-width: 760px;
+  padding-top: 24px;
+  display: grid;
+  gap: 20px;
+}
+.account-identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid #e7dff0;
+  border-radius: 22px;
+  background: #f5f0fa;
+}
+.account-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 58px;
+  height: 58px;
+  border-radius: 18px;
+  background: white;
+  color: var(--purple);
+  font:
+    26px/1 Georgia,
+    serif;
+}
+.account-identity-copy {
+  min-width: 0;
+}
+.account-kicker {
+  color: var(--purple);
+  font-size: 10px;
+  margin-bottom: 6px;
+}
+.account-identity h1 {
+  font:
+    26px/1.2 Georgia,
+    serif;
+  letter-spacing: -0.6px;
+  overflow-wrap: anywhere;
+}
+.account-email {
+  margin-top: 7px;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.account-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.account-section-heading > svg {
   color: var(--purple);
   flex-shrink: 0;
+}
+.account-section-heading h2 {
+  font-size: 16px;
+  letter-spacing: -0.2px;
+  margin: 0;
+}
+.account-details .form-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+.account-details .form-grid label {
+  font-size: 12px;
+}
+.account-details .address-actions .button {
+  width: 100%;
+  font-size: 13px;
+}
+.account-shortcuts {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: white;
+  overflow: hidden;
+}
+.account-menu-row + .account-menu-row {
+  border-top: 1px solid var(--line);
+}
+.account-menu-row:hover {
+  background: var(--paper);
+}
+.account-menu-row:focus-visible {
+  outline-offset: -3px;
+}
+.account-menu-icon {
+  flex: 0 0 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--lilac);
+  color: var(--purple);
+}
+.account-count {
+  padding: 3px 8px;
+  background: var(--paper);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.account-orders {
+  scroll-margin-top: 100px;
+}
+.account-orders .order-status {
+  font-size: 10px;
+  max-width: 140px;
+  text-align: center;
+}
+.account-orders .order-card {
+  border-radius: 20px;
+}
+.account-empty-orders {
+  padding: 24px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: white;
+}
+.account-empty-orders h3 {
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+.account-empty-orders .text-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.account-sign-out {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: white;
+  color: var(--ink);
+  text-align: left;
+  font-size: 14px;
+}
+.account-sign-out:hover:not(:disabled) {
+  background: var(--blush);
+}
+.account-sign-out .account-menu-icon {
+  background: var(--paper);
+}
+.account-sign-out > svg {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.account-session .delete-account-section {
+  margin-top: 14px;
+  padding-top: 0;
+  border-top: 0;
+  text-align: center;
+}
+.account-session .delete-account-button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+}
+@media (min-width: 600px) {
+  .account-details .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .account-details .address-actions .button {
+    width: auto;
+  }
 }
 .address-book-card {
   display: grid;
@@ -2720,14 +3056,47 @@ html:has(.checkout-sheet[open]) {
 .more-page {
   max-width: 680px;
   padding-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: calc(100svh - 64px - var(--safe-top) - var(--dock-bottom) - 26px);
+}
+.more-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid #e7dff0;
+  border-radius: 20px;
+  background: #f5f0fa;
+}
+.more-brand > img {
+  flex-shrink: 0;
+  border-radius: 14px;
+}
+.more-brand-copy {
+  min-width: 0;
+}
+.more-brand-name {
+  font:
+    bold 30px/1.1 Georgia,
+    serif;
+  letter-spacing: -1.5px;
+}
+.more-brand-category {
+  margin-top: 7px;
+  font-size: 12px;
+  color: var(--muted);
 }
 .more-section {
-  margin-bottom: 26px;
+  min-width: 0;
 }
 .more-section h2 {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
-  margin: 0 4px 12px;
+  letter-spacing: 0;
+  margin: 0 4px 10px;
+  color: var(--muted);
 }
 .more-links {
   background: white;
@@ -2736,35 +3105,100 @@ html:has(.checkout-sheet[open]) {
   overflow: hidden;
 }
 .more-link {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px;
+  padding: 12px 14px;
   min-height: 58px;
+  background: transparent;
+  border: 0;
   font-size: 14px;
+  text-align: left;
+  color: var(--ink);
 }
 .more-link + .more-link {
   border-top: 1px solid var(--line);
 }
-.more-link > span {
+.more-link-label {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.more-link > svg {
+.more-link-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--paper);
   color: var(--purple);
-  flex-shrink: 0;
 }
-.more-link > svg:last-child {
+.more-section[data-section='support'] .more-link-icon {
+  background: var(--lilac);
+}
+.more-section[data-section='app'] .more-link-icon {
+  background: var(--blush);
+}
+.more-link > svg {
+  flex-shrink: 0;
   color: var(--muted);
 }
 .more-link:hover {
   background: var(--paper);
 }
+.more-link:focus-visible {
+  outline-offset: -3px;
+  border-radius: 10px;
+}
 .more-empty {
   color: var(--muted);
   padding: 18px 16px;
   font-size: 12px;
+}
+.more-share-message {
+  padding: 0 16px 12px;
+  font-size: 12px;
+  color: var(--purple);
+}
+.more-share-fallback {
+  display: grid;
+  gap: 8px;
+  padding: 0 16px 16px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.more-share-fallback input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 16px;
+}
+.more-footer {
+  margin-top: auto;
+  padding: 6px 0 10px;
+  text-align: center;
+  color: var(--muted);
+}
+.more-version {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.more-credit {
+  margin-top: 12px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.more-credit strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
 }
 .info-page {
   max-width: 780px;

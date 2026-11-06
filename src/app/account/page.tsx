@@ -3,12 +3,13 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { AuthForm } from '@/components/auth-form';
 import { signOut } from '@/app/auth/actions';
+import { SignOutButton } from '@/components/sign-out-button';
 import { money } from '@/lib/commerce';
 import { getSavedAddress } from '@/lib/address-server';
 import { CustomerProfile } from '@/components/customer-profile';
 import { DeleteAccount } from '@/components/delete-account';
 import { getCustomerProfile } from '@/lib/profile-server';
-import { MapPin, ChevronRight } from 'lucide-react';
+import { MapPin, ChevronRight, Package, UserRound, ArrowRight } from 'lucide-react';
 export const metadata = { title: 'Your account' };
 export const dynamic = 'force-dynamic';
 export default async function Account({
@@ -29,7 +30,9 @@ export default async function Account({
           ) : null}
           {params.error ? (
             <p role="alert" className="notice">
-              This link has expired. Sign in again.
+              {params.error === 'oauth'
+                ? 'Google sign-in wasn’t completed. Please try again.'
+                : 'This link has expired. Sign in again.'}
             </p>
           ) : null}
           <AuthForm next={params.next === 'checkout' ? 'checkout' : ''} />
@@ -60,107 +63,138 @@ export default async function Account({
     shipping: { payment_mode?: string };
   };
   const orders = (result.data ?? []) as Order[];
+  const name = personal.profile?.name.trim() ?? '';
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => Array.from(part)[0])
+    .join('')
+    .toUpperCase();
   return (
-    <main id="main" className="page-width section-space">
-      <div className="section-heading">
-        <div>
-          <h1>My account</h1>
-          <p>{user.email}</p>
+    <main id="main" className="page-width account-page">
+      <header className="account-identity">
+        <div className="account-avatar" aria-hidden="true">
+          {initials || <UserRound size={28} strokeWidth={1.4} />}
         </div>
-        <form action={signOut}>
-          <button className="button button-outline">Sign out</button>
-        </form>
-      </div>
+        <div className="account-identity-copy">
+          <p className="account-kicker">Your profile</p>
+          <h1>{name || 'My account'}</h1>
+          <p className="account-email">{user.email}</p>
+        </div>
+      </header>
       <CustomerProfile
         key={user.id}
         profile={personal.profile}
         fallback={addressBook.address}
         error={personal.error}
       />
-      <Link href="/account/addresses" className="account-menu-row">
-        <MapPin size={20} />
-        <span>Saved addresses</span>
-        <span className="muted">{addressBook.addresses.length || ''}</span>
-        <ChevronRight size={18} />
-      </Link>
-      <h2 className="orders-heading">Orders</h2>
-      {result.error ? (
-        <div className="notice" role="status">
-          Orders are unavailable. Try again later.
+      <nav className="account-shortcuts" aria-label="Account shortcuts">
+        <Link href="/account/addresses" className="account-menu-row">
+          <span className="account-menu-icon" aria-hidden="true">
+            <MapPin size={19} />
+          </span>
+          <span className="account-menu-label">Saved addresses</span>
+          {addressBook.addresses.length ? (
+            <span className="account-count">{addressBook.addresses.length}</span>
+          ) : null}
+          <ChevronRight size={17} aria-hidden="true" />
+        </Link>
+      </nav>
+      <section
+        className="account-orders"
+        id="account-orders"
+        aria-labelledby="account-orders-title"
+      >
+        <div className="account-section-heading">
+          <Package size={18} aria-hidden="true" />
+          <h2 id="account-orders-title">Orders</h2>
         </div>
-      ) : orders.length ? (
-        <div className="orders-list">
-          {orders.map((order) => (
-            <article key={order.id} className="order-card">
-              <div className="order-card-heading">
-                <div>
-                  <span className="little-label">ORDER #{order.id.slice(0, 8).toUpperCase()}</span>
-                  <p>
-                    {new Date(order.created_at).toLocaleDateString('en-IN', {
-                      dateStyle: 'medium',
-                      timeZone: 'Asia/Kolkata',
-                    })}
-                  </p>
-                </div>
-                <span className="order-status">
-                  {order.status === 'awaiting_confirmation'
-                    ? 'Pending confirmation'
-                    : order.status.replaceAll('_', ' ')}
-                </span>
-              </div>
-              {order.items.map((item, index) => (
-                <div className="order-line" key={index}>
-                  <span>
-                    {item.name} {item.option !== 'Standard' ? `· ${item.option}` : ''} ×{' '}
-                    {item.quantity}
+        {result.error ? (
+          <div className="notice" role="status">
+            Orders are unavailable. Try again later.
+          </div>
+        ) : orders.length ? (
+          <div className="orders-list">
+            {orders.map((order) => (
+              <article key={order.id} className="order-card">
+                <div className="order-card-heading">
+                  <div>
+                    <span className="little-label">
+                      ORDER #{order.id.slice(0, 8).toUpperCase()}
+                    </span>
+                    <p>
+                      {new Date(order.created_at).toLocaleDateString('en-IN', {
+                        dateStyle: 'medium',
+                        timeZone: 'Asia/Kolkata',
+                      })}
+                    </p>
+                  </div>
+                  <span className="order-status">
+                    {order.status === 'awaiting_confirmation'
+                      ? 'Pending confirmation'
+                      : order.status.replaceAll('_', ' ')}
                   </span>
-                  <span>{money(item.unit_price * item.quantity)}</span>
                 </div>
-              ))}
-              <div className="order-shipping-breakdown">
-                <span>Items</span>
-                <span>{money(order.item_total)}</span>
-              </div>
-              <div className="order-shipping-breakdown">
-                <span>
-                  Delivery{order.shipping_area_name ? ` · ${order.shipping_area_name}` : ''}
-                </span>
-                <span>
-                  {order.shipping_price == null
-                    ? 'Not yet priced'
-                    : order.shipping_price === 0
-                      ? 'Free'
-                      : money(order.shipping_price)}
-                </span>
-              </div>
-              <div className="order-total">
-                <strong>{order.order_total == null ? 'Item total' : 'Order total'}</strong>
-                <strong>{money(order.order_total ?? order.item_total)}</strong>
-              </div>
-              {order.shipping?.payment_mode === 'cash_on_delivery' ||
-              order.shipping?.payment_mode === 'manual_upi' ? (
+                {order.items.map((item, index) => (
+                  <div className="order-line" key={index}>
+                    <span>
+                      {item.name} {item.option !== 'Standard' ? `· ${item.option}` : ''} ×{' '}
+                      {item.quantity}
+                    </span>
+                    <span>{money(item.unit_price * item.quantity)}</span>
+                  </div>
+                ))}
                 <div className="order-shipping-breakdown">
-                  <span>Payment mode</span>
-                  <span>{paymentLabel(order.shipping.payment_mode)}</span>
+                  <span>Items</span>
+                  <span>{money(order.item_total)}</span>
                 </div>
-              ) : null}
-              {order.order_total == null ? (
-                <p className="tax-note">Delivery charge to be confirmed.</p>
-              ) : order.shipping?.payment_mode === 'manual_upi' ? (
-                <p className="tax-note">Contact the store for UPI payment details.</p>
-              ) : null}
-            </article>
-          ))}
-        </div>
-      ) : (
-        <div className="empty-state">
-          <h2>No orders yet</h2>
-          <Link href="/shop" className="button button-dark">
-            Shop products →
-          </Link>
-        </div>
-      )}
-      <DeleteAccount />
+                <div className="order-shipping-breakdown">
+                  <span>
+                    Delivery{order.shipping_area_name ? ` · ${order.shipping_area_name}` : ''}
+                  </span>
+                  <span>
+                    {order.shipping_price == null
+                      ? 'Not yet priced'
+                      : order.shipping_price === 0
+                        ? 'Free'
+                        : money(order.shipping_price)}
+                  </span>
+                </div>
+                <div className="order-total">
+                  <strong>{order.order_total == null ? 'Item total' : 'Order total'}</strong>
+                  <strong>{money(order.order_total ?? order.item_total)}</strong>
+                </div>
+                {order.shipping?.payment_mode === 'cash_on_delivery' ||
+                order.shipping?.payment_mode === 'manual_upi' ? (
+                  <div className="order-shipping-breakdown">
+                    <span>Payment mode</span>
+                    <span>{paymentLabel(order.shipping.payment_mode)}</span>
+                  </div>
+                ) : null}
+                {order.order_total == null ? (
+                  <p className="tax-note">Delivery charge to be confirmed.</p>
+                ) : order.shipping?.payment_mode === 'manual_upi' ? (
+                  <p className="tax-note">Contact the store for UPI payment details.</p>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="account-empty-orders">
+            <h3>No orders yet</h3>
+            <Link href="/shop" className="text-link">
+              Shop products <ArrowRight size={16} aria-hidden="true" />
+            </Link>
+          </div>
+        )}
+      </section>
+      <div className="account-session">
+        <form action={signOut}>
+          <SignOutButton />
+        </form>
+        <DeleteAccount />
+      </div>
     </main>
   );
 }

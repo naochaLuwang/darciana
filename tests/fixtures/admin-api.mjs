@@ -2,7 +2,7 @@ import { createDeleteAccountHandler } from '../../supabase/functions/delete-acco
 // Isolated browser-test API. Never used by the app unless explicitly configured
 // by playwright.admin.config.ts. No live Supabase credentials or data are used.
 import { createServer } from 'node:http';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { variantPrice } from '../../src/lib/commerce.ts';
 export const OWNER = '22222222-2222-4222-8222-222222222222';
 export const CUSTOMER = '11111111-1111-4111-8111-111111111111';
@@ -31,9 +31,11 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     addresses,
     addressesUnavailable,
     failAddressSave;
-  let profiles, addressBook, deletedUsers, siteSettings;
+  let profiles, addressBook, deletedUsers, siteSettings, oauthChallenges, oauthDenied;
   const timestamp = () => new Date().toISOString();
   function reset() {
+    oauthChallenges = new Map();
+    oauthDenied = false;
     siteSettings = [
       {
         id: '77777777-7777-4777-8777-777777777771',
@@ -195,6 +197,37 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
       failAddressSave = true;
       return reply(200, {});
     }
+    if (path === '/__oauth/deny') {
+      oauthDenied = true;
+      return reply(200, {});
+    }
+    if (path === '/auth/v1/authorize') {
+      const redirect = url.searchParams.get('redirect_to');
+      if (
+        !['http://127.0.0.1:3002/auth/callback', 'http://127.0.0.1:5174/auth/callback'].includes(
+          redirect,
+        )
+      )
+        return reply(400, { message: 'Invalid fixture redirect' });
+      const callback = new URL(redirect);
+      if (
+        url.searchParams.get('provider') !== 'google' ||
+        url.searchParams.get('redirect_to') !== callback.href ||
+        !url.searchParams.get('code_challenge') ||
+        url.searchParams.get('code_challenge_method')?.toLowerCase() !== 's256'
+      )
+        return reply(400, { message: 'Invalid fixture OAuth request' });
+      if (oauthDenied) callback.searchParams.set('error', 'access_denied');
+      else {
+        const code = randomUUID();
+        oauthChallenges.set(code, url.searchParams.get('code_challenge'));
+        callback.searchParams.set('code', code);
+        // The application must ignore arbitrary redirect query parameters.
+        callback.searchParams.set('next', 'https://untrusted.example/');
+      }
+      res.writeHead(302, { Location: callback.href });
+      return res.end();
+    }
     const token = (req.headers.authorization ?? '').replace('Bearer ', '');
     let user = null;
     try {
@@ -258,6 +291,15 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
       return reply(response.status, await response.json());
     }
     if (path === '/auth/v1/token') {
+      if (url.searchParams.get('grant_type') === 'pkce') {
+        const challenge = oauthChallenges.get(args.auth_code);
+        const supplied = createHash('sha256')
+          .update(args.code_verifier ?? '')
+          .digest('base64url');
+        if (!challenge || challenge !== supplied)
+          return reply(400, { error_code: 'bad_code_verifier', message: 'Invalid PKCE verifier' });
+        oauthChallenges.delete(args.auth_code);
+      }
       const id = args.email === 'owner@example.com' ? OWNER : CUSTOMER;
       return reply(200, {
         access_token: tokenFor(id),

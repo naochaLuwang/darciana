@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import {
@@ -19,8 +20,8 @@ const tabs = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/categories', label: 'Categories', icon: LayoutGrid },
   { href: '/saved', label: 'Saved', icon: Heart },
+  { href: '/account', label: 'Profile', icon: UserRound },
   { href: '/more', label: 'More', icon: Ellipsis },
-  { href: '/account', label: 'Account', icon: UserRound },
 ];
 
 export function Header() {
@@ -43,7 +44,7 @@ export function Header() {
             ? 'Saved addresses'
             : path === '/shop'
               ? 'Shop'
-              : tabs.find((tab) => tab.href === path)?.label || 'Darciana';
+              : tabs.find((tab) => tab.href === path)?.label || 'Daciana';
   return (
     <header className="app-header">
       <div className="app-topbar page-width">
@@ -74,8 +75,15 @@ export function Header() {
             </Link>
           ) : null}
           {path === '/' ? (
-            <Link href="/" className="wordmark" aria-label="Darciana home">
-              darciana<span>✳</span>
+            <Link href="/" className="header-logo" aria-label="Daciana home">
+              <Image
+                src="/branding/daciana-logo-transparent.png"
+                alt="Daciana — Stationery & Cosmetics"
+                width={1774}
+                height={887}
+                sizes="(min-width: 600px) 355px, 300px"
+                loading="eager"
+              />
             </Link>
           ) : (
             <span className="screen-title">{title}</span>
@@ -145,8 +153,7 @@ export function BottomNav() {
   );
 }
 
-// Avoid putting app navigation above a virtual keyboard. Native keyboard events
-// can be connected here when the Capacitor project is added.
+// Native keyboard events and browser viewport changes share this UI state.
 export function ViewportBehavior() {
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -155,7 +162,9 @@ export function ViewportBehavior() {
     const update = () => {
       const editable = document.activeElement?.matches('input, textarea, [contenteditable="true"]');
       if (!editable) fullHeight = Math.max(fullHeight, window.innerHeight);
-      const keyboard = !!editable && fullHeight - viewport.height > 140;
+      const keyboard =
+        document.documentElement.dataset.nativeKeyboard === 'open' ||
+        (!!editable && fullHeight - viewport.height > 140);
       document.documentElement.dataset.keyboard = keyboard ? 'open' : 'closed';
     };
     const onOrientation = () => {
