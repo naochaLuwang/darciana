@@ -8,6 +8,7 @@ import { slugify, type ProductInput } from '@/lib/admin-validation';
 import type { AdminProduct } from '@/lib/admin';
 import type { Category } from '@/lib/commerce';
 import { ImageField } from './image-field';
+import { roundRupees } from '@/lib/money';
 
 type DraftVariant = ProductInput['variants'][number] & { key: string };
 function blankVariant(): DraftVariant {
@@ -41,15 +42,24 @@ export function ProductEditor({
   const [description, setDescription] = useState(initial?.description ?? '');
   const [status, setStatus] = useState(initial?.status ?? 'inactive');
   const [hasVariants, setHasVariants] = useState(initial?.has_variants ?? false);
-  const [basePrice, setBasePrice] = useState(initial?.base_price ?? 0);
+  const [basePrice, setBasePrice] = useState(roundRupees(initial?.base_price ?? 0));
   const [discountType, setDiscountType] = useState(initial?.discount_type ?? 'none');
-  const [discountValue, setDiscountValue] = useState(initial?.discount_value ?? 0);
+  const [discountValue, setDiscountValue] = useState(
+    initial?.discount_type === 'amount'
+      ? roundRupees(initial.discount_value)
+      : (initial?.discount_value ?? 0),
+  );
   const [image, setImage] = useState(initial?.thumbnail_url ?? '');
   const [categoryIds, setCategoryIds] = useState(initial?.categoryIds ?? []);
   const [variants, setVariants] = useState<DraftVariant[]>(() =>
     initial?.product_variants.length
       ? initial.product_variants.map((variant) => ({
           ...variant,
+          price: roundRupees(variant.price),
+          discount_value:
+            variant.discount_type === 'amount'
+              ? roundRupees(variant.discount_value)
+              : variant.discount_value,
           key: variant.id,
           image_url: variant.image_url ?? '',
           hex_code: variant.hex_code ?? '',
@@ -211,9 +221,10 @@ export function ProductEditor({
                   required
                   min="0"
                   max="1000000"
-                  step="0.01"
+                  step="1"
                   value={basePrice}
                   onChange={(event) => setBasePrice(Number(event.target.value))}
+                  onBlur={(event) => setBasePrice(roundRupees(Number(event.currentTarget.value)))}
                 />
               </label>
               <label>
@@ -237,10 +248,14 @@ export function ProductEditor({
                     type="number"
                     required
                     min="0"
-                    step="0.01"
+                    step={discountType === 'percentage' ? '0.01' : '1'}
                     max={discountType === 'percentage' ? 100 : basePrice}
                     value={discountValue}
                     onChange={(event) => setDiscountValue(Number(event.target.value))}
+                    onBlur={(event) => {
+                      if (discountType === 'amount')
+                        setDiscountValue(roundRupees(Number(event.currentTarget.value)));
+                    }}
                   />
                 </label>
               ) : null}
@@ -327,11 +342,16 @@ export function ProductEditor({
                         type="number"
                         min="0"
                         max="1000000"
-                        step="0.01"
+                        step="1"
                         required
                         value={variant.price}
                         onChange={(event) =>
                           patchVariant(index, { price: Number(event.target.value) })
+                        }
+                        onBlur={(event) =>
+                          patchVariant(index, {
+                            price: roundRupees(Number(event.currentTarget.value)),
+                          })
                         }
                       />
                     </label>
@@ -357,13 +377,19 @@ export function ProductEditor({
                         <input
                           type="number"
                           min="0"
-                          step="0.01"
+                          step={variant.discount_type === 'percentage' ? '0.01' : '1'}
                           required
                           max={variant.discount_type === 'percentage' ? 100 : variant.price}
                           value={variant.discount_value}
                           onChange={(event) =>
                             patchVariant(index, { discount_value: Number(event.target.value) })
                           }
+                          onBlur={(event) => {
+                            if (variant.discount_type === 'amount')
+                              patchVariant(index, {
+                                discount_value: roundRupees(Number(event.currentTarget.value)),
+                              });
+                          }}
                         />
                       </label>
                     ) : null}
@@ -381,6 +407,7 @@ export function ProductEditor({
               {hasVariants ? (
                 <ImageField
                   label={`Option ${index + 1} image`}
+                  folder="variants"
                   value={variant.image_url}
                   onChange={(value) => patchVariant(index, { image_url: value })}
                   onBusy={trackUpload}

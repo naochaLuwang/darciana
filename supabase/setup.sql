@@ -84,7 +84,7 @@ begin
     if raw_price is null or raw_price < 0 or raw_price::text in ('NaN','Infinity','-Infinity') then raise exception 'UNAVAILABLE'; end if;
     unit_price := round(greatest(0, case discount_kind
       when 'percentage' then raw_price * (1 - discount_amount / 100)
-      when 'amount' then raw_price - discount_amount else raw_price end), 2);
+      when 'amount' then raw_price - discount_amount else raw_price end), 0);
     total := total + unit_price * quantity;
     snapshot := snapshot || jsonb_build_array(jsonb_build_object(
       'product_id', product.id, 'variant_id', variant.id, 'name', product.name,

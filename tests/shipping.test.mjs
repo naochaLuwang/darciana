@@ -16,10 +16,11 @@ test('shipping validation requires an actual area selection and valid INR charge
     is_active: true,
   };
   assert.equal(shippingAreaSchema.parse(area).name, 'Central Market');
-  for (const price of [-1, 10.123, Infinity, 100001])
+  for (const price of [-1, 10.123, 10.5, Infinity, 100001])
     assert.equal(shippingAreaSchema.safeParse({ ...area, price }).success, false);
   assert.equal(shippingAreaSchema.safeParse({ ...area, price: 0 }).success, true);
-  assert.equal(totalWithShipping(19.99, 40.1), 60.09);
+  assert.equal(totalWithShipping(19.99, 40.1), 60);
+  assert.equal(totalWithShipping(1500, 50.5), 1551);
   assert.equal(
     checkoutSchema.safeParse({ shippingAreaId: 'typed-area-name', expectedShippingPrice: 0 })
       .success,

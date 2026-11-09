@@ -1,10 +1,18 @@
 import { test, expect, type Page } from '@playwright/test';
+import { checkProductGalleries } from '../fixtures/product-gallery';
 
 test.beforeEach(async ({ request, page }) => {
   await request.get('http://127.0.0.1:54329/__reset');
   page.on('pageerror', (error) => {
     throw error;
   });
+});
+
+test('product galleries show every product photo and isolate selected variant photos', async ({
+  page,
+  request,
+}) => {
+  await checkProductGalleries(page, request, true);
 });
 
 async function signIn(page: Page, email = 'customer@example.com') {
@@ -63,7 +71,7 @@ test('profile, address book and COD checkout use the shared database actions', a
   await page.getByRole('checkbox', { name: 'I accept the terms and conditions' }).check();
   await order.click();
   await expect(page.getByRole('heading', { name: 'Order received', exact: true })).toBeVisible();
-  await expect(page.getByText(/Total ₹349.00/)).toBeVisible();
+  await expect(page.getByText(/Total ₹349/)).toBeVisible();
   await page.getByRole('link', { name: 'View orders', exact: true }).click();
   await expect(page.getByLabel('Full name', { exact: true })).toHaveValue('Native Customer');
   await page.getByRole('link', { name: /Saved addresses/ }).click();
@@ -119,4 +127,67 @@ test('offline bag persists and signed-in customers can clear their session offli
   await expect(
     page.getByRole('heading', { name: 'Sign in to checkout', exact: true }),
   ).toBeVisible();
+});
+
+test('each customer route shows its matching skeleton while data loads', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await signIn(page);
+  let release: () => void = () => {};
+  let gate = Promise.resolve();
+  await page.route('**/rest/v1/**', async (route) => {
+    await gate;
+    await route.continue();
+  });
+  const screens = [
+    ['/', 'home'],
+    ['/categories', 'categories'],
+    ['/shop', 'shop'],
+    ['/saved', 'saved'],
+    ['/product/rose-lip-tint', 'product'],
+    ['/bag', 'bag'],
+    ['/checkout', 'checkout'],
+    ['/account', 'account'],
+    ['/account/addresses', 'addresses'],
+    ['/more', 'more'],
+    ['/more/privacy-policy', 'information'],
+  ];
+  try {
+    for (const [path, screen] of screens) {
+      gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      await page.goto(`/#${path}`);
+      // A hash-only navigation can use the warm catalog cache. Reload to test
+      // the actual data-wait state for each destination independently.
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      const skeleton = page.locator(`[data-skeleton="${screen}"]`);
+      await expect(skeleton).toBeVisible();
+      await expect(skeleton).toHaveAttribute('aria-busy', 'true');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      );
+      expect(
+        await skeleton
+          .locator('.skeleton-shape')
+          .first()
+          .evaluate((element) => getComputedStyle(element).animationName),
+      ).toBe('none');
+      const labelSize = await skeleton.getByText(/^Loading /).evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        return { width: bounds.width, height: bounds.height };
+      });
+      expect(labelSize.width).toBeLessThanOrEqual(1);
+      expect(labelSize.height).toBeLessThanOrEqual(1);
+      if (['home', 'checkout', 'product'].includes(screen))
+        await page.screenshot({
+          path: `test-results/skeleton-${screen}-mobile.png`,
+          fullPage: true,
+        });
+      release();
+      await expect(page.locator('[data-skeleton]')).toHaveCount(0);
+    }
+  } finally {
+    release();
+  }
 });

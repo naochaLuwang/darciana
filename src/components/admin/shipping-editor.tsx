@@ -4,9 +4,10 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveShippingArea } from '@/app/admin/actions';
 import type { ShippingArea } from '@/lib/shipping';
+import { roundRupees } from '@/lib/money';
 export function ShippingEditor({ initial }: { initial?: ShippingArea }) {
   const [name, setName] = useState(initial?.name ?? '');
-  const [price, setPrice] = useState(initial ? String(initial.price) : '');
+  const [price, setPrice] = useState(initial ? String(roundRupees(initial.price)) : '');
   const [active, setActive] = useState(initial?.is_active ?? true);
   const [error, setError] = useState('');
   const [pending, startTransition] = useTransition();
@@ -61,11 +62,15 @@ export function ShippingEditor({ initial }: { initial?: ShippingArea }) {
           type="number"
           min="0"
           max="100000"
-          step="0.01"
+          step="1"
           aria-describedby="shipping-price-help"
           value={price}
           placeholder="e.g. 50"
           onChange={(event) => setPrice(event.target.value)}
+          onBlur={(event) => {
+            if (event.currentTarget.value !== '')
+              setPrice(String(roundRupees(Number(event.currentTarget.value))));
+          }}
         />
       </label>
       <small id="shipping-price-help">Use 0 for free delivery to this area.</small>

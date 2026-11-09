@@ -21,10 +21,10 @@ In **Authorized JavaScript origins**, add the origins you actually use:
 ```text
 http://localhost:3000
 http://127.0.0.1:3000
-https://YOUR_APP_DOMAIN
+https://dacianastore.in
 ```
 
-Replace the last entry with the real deployed app origin. These are origins, with no `/auth/callback` path.
+These are origins, with no `/auth/callback` path.
 
 In **Authorized redirect URIs**, enter this project's Supabase callback:
 
@@ -44,15 +44,20 @@ Enter Google's secret directly in Supabase. It does not belong in this repositor
 
 Open [Supabase Authentication → URL Configuration](https://supabase.com/dashboard/project/bcozsouelwdvlkcfxerx/auth/url-configuration).
 
-Set **Site URL** to the deployed app origin, or `http://localhost:3000` while developing only locally. Add the exact URLs you use under **Redirect URLs**:
+Set **Site URL** to `https://dacianastore.in`. Add these exact entries under **Redirect URLs**. The Android custom scheme belongs in this Supabase list:
 
 ```text
 http://localhost:3000/auth/callback
 http://127.0.0.1:3000/auth/callback
-https://YOUR_APP_DOMAIN/auth/callback
+https://dacianastore.in/auth/callback
+com.luwangtech.daciana://auth/callback
 ```
 
 Google redirects to **Supabase's** `/auth/v1/callback`. Supabase then redirects to **the app's** `/auth/callback`. These are separate settings. Keep the browser on the same host when starting and finishing sign-in so its PKCE verifier cookie is available. See [Supabase redirect configuration](https://supabase.com/docs/guides/auth/redirect-urls).
+
+If both the website and Android app return to localhost, confirm these settings first. Live diagnostics found that both production callback URLs fell back to `http://localhost:3000`. Changing app code or rebuilding the APK does not add URLs to Supabase's allowlist. Save the configuration, close the previous Google sign-in tab, and start a new sign-in from the website or app.
+
+Run `npm run check:auth-redirects` to verify both destinations without signing in or modifying any account. It uses deliberately invalid confirmation links to check where Supabase sends the error response; both callbacks should report `PASS`. This verifies the allowlist, while a real Google sign-in still needs testing on each platform.
 
 ## 5. Test in a browser
 

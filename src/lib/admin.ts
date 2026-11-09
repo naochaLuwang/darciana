@@ -80,6 +80,12 @@ export function adminError(error: { code?: string; message?: string } | null) {
     return 'That parent would create a category loop. Choose another parent.';
   if (error.message?.includes('EXISTING_VARIANTS_REQUIRED'))
     return 'Keep existing options and set unwanted options to zero stock.';
+  if (error.message?.includes('PRODUCT_REFERENCED'))
+    return 'This product is linked to records in another part of the store. Make it inactive, or remove those links before deleting it.';
+  if (error.message?.includes('INVALID_DELETE_CONFIRMATION'))
+    return 'Type DELETE to confirm permanent deletion.';
+  if (error.message?.includes('NOT_FOUND'))
+    return 'This record no longer exists. Refresh the page.';
   if (error.code === '23505')
     return error.message?.includes('shipping_areas')
       ? 'An area with that name already exists.'

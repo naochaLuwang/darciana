@@ -1,6 +1,6 @@
 # Daciana for Android
 
-**Name:** Daciana · **Application ID:** `com.luwangtech.daciana` · **Version:** 0.1.0 (code 1)
+**Name:** Daciana · **Application ID:** `com.luwangtech.daciana` · **Version:** 1.0.0 (code 1)
 
 The Capacitor 8 Android app bundles its customer interface inside the APK. It does not load a hosted website or install a PWA. The existing Next.js website and admin dashboard continue to run separately.
 
@@ -50,6 +50,8 @@ In [Supabase Authentication → URL Configuration](https://supabase.com/dashboar
 com.luwangtech.daciana://auth/callback
 ```
 
+Set **Site URL** to `https://dacianastore.in` and also allow `https://dacianastore.in/auth/callback` for the website. Run `npm run check:auth-redirects` to check both destinations. A callback missing from the allowlist can fall back to the Site URL; when that is localhost, Google sign-in sends the customer there. These settings take effect without rebuilding the APK. Start a fresh sign-in after saving them.
+
 For a browser-only mobile preview that uses the real project, also allow `http://127.0.0.1:5173/auth/callback`. The production Android app always uses the custom scheme above. Keep Google provider credentials in Supabase, not in the native project. See [Supabase mobile deep linking](https://supabase.com/docs/guides/auth/native-mobile-deep-linking) and the [Google setup guide](google-sign-in.md).
 
 Sign-up email confirmation uses the same app link and the verifier saved on the originating device. Confirm from that device. A callback without a matching, unexpired flow cannot establish a session. Customers signing in from checkout return to checkout with their bag intact.
@@ -84,7 +86,11 @@ DACIANA_ANDROID_STORE_PASSWORD
 DACIANA_ANDROID_KEY_PASSWORD
 ```
 
-Then run `npm run android:bundle`. With all four variables set, Gradle signs the release and produces `artifacts/daciana-release.aab`. Without them it produces `artifacts/daciana-release-unsigned.aab`, which needs signing before upload. Never use a debug keystore for publication. Increment `versionCode` in `android/app/build.gradle` for every Play update and keep `versionName` aligned with `package.json`.
+For the confirmed first release, `npm run android:upload-key` created the private keystore in `.secrets/android/` and credentials in `.secrets/android-release.env`; both are ignored by Git. Back up both securely. The command refuses to overwrite an existing key. The build wrapper loads these credentials automatically; CI can supply the four environment variables instead.
+
+Run `npm run android:bundle` to produce the signed `artifacts/daciana-release.aab`. Missing signing credentials now stop the build. `npm run android:release-apk` produces a signed APK for phone testing. Never use a debug keystore for publication. Increment `versionCode` in `android/app/build.gradle` for every Play upload; `versionName` is read from `package.json`.
+
+See [the Play Store release checklist](play-store-release.md) for deployment blockers, listing materials, signing backups and Personal account testing requirements. The public `/delete-account` request page must be deployed alongside the existing privacy page before submitting the deletion URL to Play.
 
 Before publication, test the APK on real devices, including Google sign-in, confirmation links, account deletion, keyboard/back behaviour, and a controlled COD order. Complete your Play listing, privacy policy, data-safety declaration and account-deletion web page. The included browser tests simulate Google and database responses; they do not log into a real Google account or submit live orders.
 

@@ -3,8 +3,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 import { Heart, ArrowUpRight } from 'lucide-react';
-import { money, startingPrice, type Product } from '@/lib/commerce';
+import { money, roundRupees, startingPrice, type Product } from '@/lib/commerce';
 import { useShop } from './shop-provider';
+import { StoreImage } from './store-image';
 export function ProductImage({
   src,
   alt,
@@ -32,8 +33,14 @@ export function ProductImage({
       onError={() => setFailedSrc(src)}
     />
   ) : (
-    <span className="image-placeholder" aria-label="Product image unavailable">
-      d<span>✳</span>
+    <span className="image-placeholder" role="img" aria-label="Product image unavailable">
+      <StoreImage
+        asset="branding/daciana-monogram.png"
+        alt=""
+        width={80}
+        height={80}
+        className="image-placeholder-mark"
+      />
     </span>
   );
 }
@@ -49,7 +56,8 @@ export function ProductCard({
   const { saved, toggleSaved } = useShop();
   const price = startingPrice(product);
   const inStock = product.product_variants.some((variant) => variant.stock > 0);
-  const original = product.has_variants ? null : product.base_price;
+  const original =
+    product.has_variants || product.base_price === null ? null : roundRupees(product.base_price);
   return (
     <article className="product-card">
       <div className={`product-photo tint-${index % 4}`}>
@@ -65,13 +73,10 @@ export function ProductCard({
           <Heart size={17} fill={saved.includes(product.id) ? 'currentColor' : 'none'} />
         </button>
         {!inStock ? (
-          <span className="product-tag">Sold out</span>
+          <span className="product-tag product-tag-sold">Sold out</span>
         ) : original && original > price ? (
           <span className="product-tag">{Math.round((1 - price / original) * 100)}% off</span>
         ) : null}
-        <Link className="product-view" href={`/product/${product.slug}`}>
-          View product <ArrowUpRight size={16} />
-        </Link>
       </div>
       <div className="product-meta">
         {product.brand ? <span>{product.brand}</span> : null}
@@ -86,6 +91,10 @@ export function ProductCard({
         {product.has_variants ? (
           <span className="product-options">{product.product_variants.length} options</span>
         ) : null}
+        <Link className="product-view" href={`/product/${product.slug}`}>
+          {inStock ? (product.has_variants ? 'Choose options' : 'Shop now') : 'View product'}
+          <ArrowUpRight size={16} />
+        </Link>
       </div>
     </article>
   );

@@ -82,7 +82,7 @@ export function CatalogBrowser({
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder={onlySaved ? 'Search saved items' : 'Search by name or brand'}
+              placeholder={onlySaved ? 'Search saved items' : 'Search products'}
               enterKeyHint="search"
             />
             {search ? (

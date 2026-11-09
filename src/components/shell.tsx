@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
+import { StoreImage as Image } from '@/components/store-image';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import {
@@ -32,19 +32,6 @@ export function Header() {
   const checkout = path === '/checkout';
   const information = path.startsWith('/more/');
   const secondary = product || checkout || information || path === '/shop';
-  const title = product
-    ? 'Product details'
-    : checkout
-      ? 'Checkout'
-      : information
-        ? 'Information'
-        : path === '/bag'
-          ? 'Bag'
-          : path === '/account/addresses'
-            ? 'Saved addresses'
-            : path === '/shop'
-              ? 'Shop'
-              : tabs.find((tab) => tab.href === path)?.label || 'Daciana';
   return (
     <header className="app-header">
       <div className="app-topbar page-width">
@@ -74,20 +61,18 @@ export function Header() {
               <ArrowLeft size={21} />
             </Link>
           ) : null}
-          {path === '/' ? (
-            <Link href="/" className="header-logo" aria-label="Daciana home">
+          <Link href="/" className="header-home" aria-label="Daciana home">
+            <span className="header-logo">
               <Image
-                src="/branding/daciana-logo-transparent.png"
+                asset="branding/daciana-logo-transparent.png"
                 alt="Daciana — Stationery & Cosmetics"
                 width={1774}
                 height={887}
                 sizes="(min-width: 600px) 355px, 300px"
                 loading="eager"
               />
-            </Link>
-          ) : (
-            <span className="screen-title">{title}</span>
-          )}
+            </span>
+          </Link>
         </div>
         <div className="app-topbar-actions">
           {path !== '/shop' ? (

@@ -87,7 +87,13 @@ export function CategoryEditor({
             ))}
         </select>
       </label>
-      <ImageField label="Category image" value={image} onChange={setImage} onBusy={setBusy} />
+      <ImageField
+        label="Category image"
+        value={image}
+        onChange={setImage}
+        onBusy={setBusy}
+        folder="categories"
+      />
       {error ? (
         <p className="form-error" role="alert">
           {error}

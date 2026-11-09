@@ -6,16 +6,36 @@ import {
   parseCart,
   resolveCart,
   categoryTreeIds,
+  money,
+  roundRupees,
 } from '../src/lib/commerce.ts';
 import { checkoutSchema } from '../src/lib/checkout.ts';
 
 test('discounts handle fixed, percentage, rounding, and discounts over the price', () => {
   assert.equal(discountedPrice(399, 'amount', 100), 299);
-  assert.equal(discountedPrice(999, 'percentage', 50), 499.5);
-  assert.equal(discountedPrice(199.99, 'percentage', 15), 169.99);
+  assert.equal(discountedPrice(999, 'percentage', 50), 500);
+  assert.equal(discountedPrice(199.99, 'percentage', 15), 170);
+  assert.equal(
+    discountedPrice(100, 'percentage', 54.5),
+    46,
+    'floating-point noise must not turn an exact half down',
+  );
   assert.equal(discountedPrice(100, 'amount', 150), 0);
   assert.equal(discountedPrice(100, 'percentage', 200), 0);
   assert.equal(discountedPrice(100, 'amount', -50), 100);
+});
+test('all INR displays use whole rupees with Indian grouping and consistent half rounding', () => {
+  for (const [amount, rounded, display] of [
+    [0, 0, '₹0'],
+    [49.49, 49, '₹49'],
+    [49.5, 50, '₹50'],
+    [149999.99, 150000, '₹1,50,000'],
+    [-49.5, -50, '-₹50'],
+  ]) {
+    assert.equal(roundRupees(amount), rounded);
+    assert.equal(money(amount), display);
+  }
+  assert.equal(Object.is(roundRupees(-0.1), -0), false);
 });
 test('simple product and variant product use the correct price source', () => {
   const product = {
@@ -88,6 +108,8 @@ test('checkout validates India delivery details, duplicate variants and client i
     false,
   );
   assert.equal(checkoutSchema.safeParse({ ...input, expectedTotal: -1 }).success, false);
+  assert.equal(checkoutSchema.safeParse({ ...input, expectedTotal: 299.5 }).success, false);
+  assert.equal(checkoutSchema.safeParse({ ...input, expectedShippingPrice: 50.5 }).success, false);
   assert.equal(
     checkoutSchema.safeParse({ ...input, shipping: { ...input.shipping, pincode: '000000' } })
       .success,

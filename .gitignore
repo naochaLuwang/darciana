@@ -49,6 +49,9 @@ local.properties
 .env*
 !.env.example
 /.aws/
+/.secrets/
+**/*firebase-adminsdk*.json
+/android/app/google-services.json
 
 # local IDE and agent settings
 .idea/

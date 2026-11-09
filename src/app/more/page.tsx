@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import Image from 'next/image';
+import { StoreImage as Image } from '@/components/store-image';
 import {
   ChevronRight,
   CircleHelp,
@@ -13,6 +13,7 @@ import {
 import { getStoreContent } from '@/lib/store-content-server';
 import { contentSlug } from '@/lib/store-content';
 import { ShareApp } from '@/components/share-app';
+import { PushSettings } from '@/components/push-settings';
 import appPackage from '../../../package.json';
 export const metadata = { title: 'More' };
 const icons: Record<string, typeof Info> = {
@@ -30,11 +31,16 @@ export default async function MorePage() {
     <main id="main" className="page-width more-page">
       <h1 className="sr-only">More</h1>
       <div className="more-brand">
-        <Image src="/branding/daciana-monogram.png" alt="" width={56} height={56} />
-        <div className="more-brand-copy">
-          <p className="more-brand-name">daciana</p>
-          <p className="more-brand-category">Cosmetics & stationery</p>
-        </div>
+        <span className="header-logo">
+          <Image
+            asset="branding/daciana-logo-transparent.png"
+            alt="Daciana — Stationery & Cosmetics"
+            width={1774}
+            height={887}
+            sizes="400px"
+            loading="eager"
+          />
+        </span>
       </div>
       {error ? (
         <p className="notice" role="status">
@@ -83,6 +89,7 @@ export default async function MorePage() {
         <div className="more-links">
           <ShareApp />
         </div>
+        <PushSettings />
       </section>
       <footer className="more-footer">
         <p className="more-version">Version {appPackage.version}</p>

@@ -1,6 +1,7 @@
 import { test, expect, type BrowserContext } from '@playwright/test';
 import { createServerClient } from '@supabase/ssr';
 import { OWNER, CUSTOMER, tokenFor } from '../fixtures/admin-api.mjs';
+import { checkProductGalleries } from '../fixtures/product-gallery';
 async function signIn(context: BrowserContext, id: string) {
   const cookies: { name: string; value: string }[] = [];
   const client = createServerClient('http://127.0.0.1:54329', 'test-publishable-key', {
@@ -22,6 +23,129 @@ async function signIn(context: BrowserContext, id: string) {
 }
 test.beforeEach(async ({ request }) => {
   await request.get('http://127.0.0.1:54329/__reset');
+});
+test('whole rupees stay consistent across admin inputs, percentage discounts, bag quantities and checkout', async ({
+  page,
+  context,
+}) => {
+  await signIn(context, OWNER);
+  await page.goto('/admin/products/33333333-3333-4333-8333-333333333333');
+  const base = page.getByLabel('Base price (₹)', { exact: true });
+  await expect(base).toHaveAttribute('step', '1');
+  await base.fill('999.5');
+  await base.blur();
+  await expect(base).toHaveValue('1000');
+  await base.fill('999');
+  const discount = page.getByLabel('Discount value', { exact: true });
+  await discount.fill('99.5');
+  await discount.blur();
+  await expect(discount).toHaveValue('100');
+  await page.getByRole('combobox', { name: 'Discount', exact: true }).selectOption('percentage');
+  await discount.fill('50');
+  await page.getByRole('button', { name: 'Save product', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Product saved.' })).toBeVisible();
+  await page.goto('/admin/shipping');
+  const delivery = page.getByLabel('Delivery price (₹)', { exact: true });
+  await delivery.fill('50.5');
+  await delivery.blur();
+  await expect(delivery).toHaveValue('51');
+  await context.clearCookies();
+  await signIn(context, CUSTOMER);
+  await page.goto('/product/rose-lip-tint');
+  await expect(page.locator('.detail-price')).toContainText('₹500');
+  await expect(page.locator('.detail-price')).not.toContainText(/₹[\d,]+\.\d/);
+  await page.getByRole('button', { name: 'Increase quantity', exact: true }).click();
+  await page.getByRole('button', { name: 'Increase quantity', exact: true }).click();
+  await page.getByRole('button', { name: 'Add to bag', exact: true }).click();
+  await page.goto('/bag');
+  await expect(page.locator('.summary-total')).toContainText('₹1,500');
+  await expect(page.locator('main')).not.toContainText(/₹[\d,]+\.\d/);
+  await page.goto('/checkout');
+  await page.getByRole('combobox', { name: 'Shipping area', exact: true }).fill('Central');
+  await page.getByRole('option', { name: /Central Market/ }).click();
+  await expect(page.locator('.summary-total')).toContainText('₹1,550');
+  await expect(page.locator('.checkout-prices')).not.toContainText(/₹[\d,]+\.\d/);
+});
+test('admin images upload to Storage, save on products and categories, and can be replaced or removed', async ({
+  page,
+  context,
+  request,
+}) => {
+  await signIn(context, OWNER);
+  const png = {
+    name: 'photo.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jN1sAAAAASUVORK5CYII=',
+      'base64',
+    ),
+  };
+  await page.goto('/admin/products/33333333-3333-4333-8333-333333333333');
+  await expect(page.locator('input[type="url"]')).toHaveCount(0);
+  await page.getByLabel('Upload product image', { exact: true }).setInputFiles(png);
+  const image = page.locator('.admin-image-preview img').first();
+  await expect(image).toHaveAttribute(
+    'src',
+    /\/storage\/v1\/object\/public\/storefront-media\/products\//,
+  );
+  const first = await image.getAttribute('src');
+  await page.getByRole('button', { name: 'Save product', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Product saved.' })).toBeVisible();
+  const products = await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json();
+  expect(products[0].thumbnail_url).toBe(first);
+  await page
+    .getByLabel('Upload product image', { exact: true })
+    .setInputFiles({ ...png, name: 'replacement.png' });
+  await expect(image).not.toHaveAttribute('src', first!);
+  await page.getByRole('button', { name: 'Remove image', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Remove image', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Save product', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Product saved.' })).toBeVisible();
+  const changed = await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json();
+  expect(changed[0].thumbnail_url).toBe('');
+  await page.goto('/admin/categories');
+  await page.getByLabel('Category name', { exact: true }).fill('Storage category');
+  await page.getByLabel('Upload category image', { exact: true }).setInputFiles(png);
+  await expect(page.locator('.admin-image-preview img')).toHaveAttribute(
+    'src',
+    /\/storefront-media\/categories\//,
+  );
+  await page.getByRole('button', { name: 'Save category', exact: true }).click();
+  await expect(page.getByText('Category saved.', { exact: true })).toBeVisible();
+  const categories = await (await request.get('http://127.0.0.1:54329/rest/v1/categories')).json();
+  expect(
+    categories.find((item: { name: string }) => item.name === 'Storage category').image_url,
+  ).toMatch(/\/storefront-media\/categories\//);
+});
+test('notification console protects access, previews announcements and disables sending with no subscribers', async ({
+  page,
+  context,
+}) => {
+  await signIn(context, CUSTOMER);
+  await page.goto('/admin/notifications');
+  await expect(page.getByRole('heading', { name: 'Admin access required' })).toBeVisible();
+  await context.clearCookies();
+  await signIn(context, OWNER);
+  await page.goto('/admin/notifications');
+  await expect(page.getByRole('heading', { name: 'Notifications', exact: true })).toBeVisible();
+  await page.getByLabel('Title', { exact: true }).fill('Fresh finds');
+  await page.getByLabel('Message', { exact: true }).fill('Explore the latest arrivals.');
+  await expect(page.getByLabel('Notification preview')).toContainText('Fresh finds');
+  await expect(page.getByLabel('Notification preview')).toContainText(
+    'Explore the latest arrivals.',
+  );
+  await page
+    .getByRole('checkbox', { name: 'Send this announcement to opted-in customers.' })
+    .check();
+  await expect(page.getByRole('button', { name: 'Send notification', exact: true })).toBeDisabled();
+  await expect(page.getByRole('heading', { name: 'Sending history' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/admin-notifications.png', fullPage: true });
+});
+test('web product galleries show all photos and isolate the selected variant', async ({
+  page,
+  request,
+}) => {
+  await checkProductGalleries(page, request);
 });
 test('account screens support password visibility, email sign-in and sign-out on a phone', async ({
   page,
@@ -176,6 +300,68 @@ test('admin navigation and editor work on a phone', async ({ page, context }) =>
   await expect(page.getByLabel('Option 2 name')).toBeVisible();
 });
 
+test('product deletion requires confirmation, reports concurrent changes and removes the product permanently', async ({
+  page,
+  context,
+  request,
+}) => {
+  await signIn(context, OWNER);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/admin/products');
+  const row = page.getByRole('row').filter({ hasText: 'Rose lip tint' });
+  const initialWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  await row.getByRole('button', { name: 'Delete Rose lip tint', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Delete product?', exact: true });
+  const confirm = dialog.getByRole('button', { name: 'Delete permanently', exact: true });
+  await expect(confirm).toBeDisabled();
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(row).toBeVisible();
+  await row.getByRole('button', { name: 'Delete Rose lip tint', exact: true }).click();
+  await dialog.getByLabel('Type DELETE to confirm', { exact: true }).fill('delete');
+  await expect(confirm).toBeDisabled();
+
+  // Another admin changes stock after this page's product snapshot was read.
+  const products = await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json();
+  const product = products.find((item: { name: string }) => item.name === 'Rose lip tint');
+  const variant = product.product_variants[0];
+  const changed = await request.post(
+    'http://127.0.0.1:54329/rest/v1/rpc/storefront_admin_set_stock',
+    {
+      headers: { Authorization: `Bearer ${tokenFor(OWNER)}` },
+      data: {
+        p_variant_id: variant.id,
+        p_stock: variant.stock + 1,
+        p_expected_updated_at: variant.updated_at,
+      },
+    },
+  );
+  expect(changed.ok()).toBe(true);
+  await dialog.getByLabel('Type DELETE to confirm', { exact: true }).fill('DELETE');
+  await confirm.click();
+  await expect(dialog.getByRole('alert')).toContainText('Someone changed this record');
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.reload();
+  await row.getByRole('button', { name: 'Delete Rose lip tint', exact: true }).click();
+  await dialog.getByLabel('Type DELETE to confirm', { exact: true }).fill('DELETE');
+  // The product table already scrolls horizontally. The new modal must fit
+  // the viewport independently and must not add overflow to that page.
+  const dialogBox = await dialog.boundingBox();
+  expect(dialogBox!.x).toBeGreaterThanOrEqual(0);
+  expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    initialWidth,
+  );
+  await page.screenshot({ path: 'test-results/delete-product-mobile.png', fullPage: true });
+  await confirm.click();
+  await expect(dialog).toHaveCount(0);
+  await expect(row).toHaveCount(0);
+  await page.reload();
+  await expect(row).toHaveCount(0);
+  await page.goto('/product/rose-lip-tint');
+  await expect(page.getByRole('heading', { name: 'Page not found', exact: true })).toBeVisible();
+});
+
 test('admin shipping setup feeds searchable checkout and saves delivery totals', async ({
   page,
   context,
@@ -186,7 +372,7 @@ test('admin shipping setup feeds searchable checkout and saves delivery totals',
   await page.getByLabel('Delivery price (₹)', { exact: true }).fill('80');
   await page.getByRole('button', { name: 'Save delivery area', exact: true }).click();
   await expect(page.getByText('Delivery area saved.', { exact: true })).toBeVisible();
-  await expect(page.getByRole('row').filter({ hasText: 'Imphal North' })).toContainText('₹80.00');
+  await expect(page.getByRole('row').filter({ hasText: 'Imphal North' })).toContainText('₹80');
   await page.screenshot({ path: 'test-results/admin-shipping.png', fullPage: true });
   await context.clearCookies();
   await signIn(context, CUSTOMER);
@@ -200,12 +386,12 @@ test('admin shipping setup feeds searchable checkout and saves delivery totals',
   await area.fill('Central');
   await area.press('ArrowDown');
   await area.press('Enter');
-  await expect(page.locator('.summary-total')).toContainText('₹349.00');
+  await expect(page.locator('.summary-total')).toContainText('₹349');
   await page.getByRole('button', { name: 'Clear delivery area' }).click();
   await area.fill('Town');
   await page.getByRole('option', { name: /Town Centre/ }).click();
   await expect(page.locator('.checkout-delivery-line')).toContainText('Free');
-  await expect(page.locator('.summary-total')).toContainText('₹299.00');
+  await expect(page.locator('.summary-total')).toContainText('₹299');
   await page.getByRole('button', { name: 'Clear delivery area' }).click();
   await area.fill('Hidden');
   await expect(
@@ -216,7 +402,7 @@ test('admin shipping setup feeds searchable checkout and saves delivery totals',
   await area.fill('north');
   await page.screenshot({ path: 'test-results/checkout-shipping-dropdown.png', fullPage: true });
   await page.getByRole('option', { name: /Imphal North/ }).click();
-  await expect(page.locator('.summary-total')).toContainText('₹379.00');
+  await expect(page.locator('.summary-total')).toContainText('₹379');
   await page.getByRole('button', { name: 'Select delivery address', exact: true }).click();
   await fillAddress(page, 'Test Customer');
   await page.getByLabel('Street address', { exact: true }).fill('12 Example Street');
@@ -225,12 +411,12 @@ test('admin shipping setup feeds searchable checkout and saves delivery totals',
   await page.getByRole('checkbox', { name: 'I accept the terms and conditions' }).check();
   await submit.click();
   await expect(page.getByRole('heading', { name: 'Order received' })).toBeVisible();
-  await expect(page.getByText(/Total ₹379.00/)).toBeVisible();
+  await expect(page.getByText(/Total ₹379/)).toBeVisible();
   await expect(page.getByText('Cash on Delivery (COD)', { exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'View orders' }).click();
   const order = page.locator('.order-card').filter({ hasText: 'Imphal North' });
-  await expect(order).toContainText('₹80.00');
-  await expect(order).toContainText('₹379.00');
+  await expect(order).toContainText('₹80');
+  await expect(order).toContainText('₹379');
   await expect(order).toContainText('Cash on Delivery (COD)');
   await page.getByRole('link', { name: /Saved addresses/ }).click();
   await expect(page.locator('.saved-address-details:visible')).toContainText('Test Customer');
@@ -481,7 +667,7 @@ test('compact mobile checkout offers COD with a cash icon and requires address, 
   await page.getByRole('link', { name: 'View orders' }).click();
   await expect(
     page.locator('.order-card').filter({ hasText: 'Cash on Delivery (COD)' }),
-  ).toContainText('₹299.00');
+  ).toContainText('₹299');
 });
 
 test('profile deletion requires explicit confirmation and the current password', async ({

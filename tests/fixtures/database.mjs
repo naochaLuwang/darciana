@@ -16,6 +16,8 @@ export async function initializeStoreDatabase(
       create table public.product_variants(id uuid primary key default gen_random_uuid(),product_id uuid not null references public.products,sku text unique not null,title text not null,price numeric not null,currency text default 'INR',stock integer not null,is_default boolean default false,image_url text,discount_type public.discount_kind default 'none',discount_value numeric default 0,hex_code text,created_at timestamptz default now(),updated_at timestamptz default now());
       create unique index one_default_option on public.product_variants(product_id) where is_default;
       create table public.product_categories(product_id uuid references public.products,category_id uuid references public.categories,primary key(product_id,category_id));
+      create table public.product_images(id uuid primary key default gen_random_uuid(),product_id uuid not null references public.products,url text not null,alt text,position integer,created_at timestamptz default now());
+      create table public.variant_images(id uuid primary key default gen_random_uuid(),product_variant_id uuid not null references public.product_variants,url text not null,alt text,position integer,created_at timestamptz default now());
       create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
       create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text references storage.buckets,name text);
       alter table storage.objects enable row level security;
@@ -26,5 +28,8 @@ export async function initializeStoreDatabase(
     `);
   await db.exec(await readFile(new URL('../../supabase/setup.sql', import.meta.url), 'utf8'));
   await db.exec(await readFile(new URL('../../supabase/admin-setup.sql', import.meta.url), 'utf8'));
+  await db.exec(
+    await readFile(new URL('../../supabase/product-delete-setup.sql', import.meta.url), 'utf8'),
+  );
   await db.exec(await readFile(new URL('../../supabase/grant-owner.sql', import.meta.url), 'utf8'));
 }

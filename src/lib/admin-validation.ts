@@ -1,22 +1,32 @@
 import { z } from 'zod';
+import { isStoreMediaUrl } from './media.ts';
 
-const price = z
-  .number()
-  .finite()
-  .min(0)
-  .max(1000000)
-  .refine(
-    (value) => Math.abs(value * 100 - Math.round(value * 100)) < 0.00001,
-    'Use no more than two decimal places.',
-  );
+const price = z.number().finite().int('Use whole rupees, without decimals.').min(0).max(1000000);
 export const imageUrl = z.union([
   z.literal(''),
   z
     .url()
     .max(2048)
-    .refine((value) => value.startsWith('https://'), 'Use an HTTPS image URL.'),
+    .refine(
+      (value) =>
+        value.startsWith('https://') ||
+        isStoreMediaUrl(value, process.env.NEXT_PUBLIC_SUPABASE_URL),
+      'Use an HTTPS image URL.',
+    ),
 ]);
-const discount = { discount_type: z.enum(['none', 'amount', 'percentage']), discount_value: price };
+// A percentage is a rate, not a rupee amount; retain fractional percentage rates.
+const discount = {
+  discount_type: z.enum(['none', 'amount', 'percentage']),
+  discount_value: z
+    .number()
+    .finite()
+    .min(0)
+    .max(1000000)
+    .refine(
+      (value) => Math.abs(value * 100 - Math.round(value * 100)) < 0.00001,
+      'Use no more than two decimal places for a percentage.',
+    ),
+};
 export const variantSchema = z
   .object({
     id: z.uuid().nullable(),
@@ -39,6 +49,10 @@ export const variantSchema = z
   .refine(
     (value) => value.discount_type !== 'amount' || value.discount_value <= value.price,
     'A discount cannot exceed the price.',
+  )
+  .refine(
+    (value) => value.discount_type !== 'amount' || Number.isInteger(value.discount_value),
+    'Use whole rupees for amount discounts.',
   );
 export const productSchema = z
   .object({
@@ -68,6 +82,12 @@ export const productSchema = z
     ...discount,
   })
   .superRefine((value, ctx) => {
+    if (value.discount_type === 'amount' && !Number.isInteger(value.discount_value))
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Use whole rupees for amount discounts.',
+        path: ['discount_value'],
+      });
     if (value.id && !value.expected_updated_at)
       ctx.addIssue({
         code: 'custom',
@@ -153,6 +173,11 @@ export const statusSchema = z.object({
   id: z.uuid(),
   status: z.enum(['active', 'inactive']),
   expected_updated_at: z.iso.datetime({ offset: true }),
+});
+export const deleteProductSchema = z.object({
+  id: z.uuid(),
+  expected_updated_at: z.iso.datetime({ offset: true }),
+  confirmation: z.literal('DELETE', { error: 'Type DELETE to confirm.' }),
 });
 export const orderStatusSchema = z.object({
   id: z.uuid(),

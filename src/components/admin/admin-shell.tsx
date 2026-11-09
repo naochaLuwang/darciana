@@ -11,6 +11,7 @@ import {
   LogOut,
   Truck,
   FileText,
+  Bell,
 } from 'lucide-react';
 import { adminSignOut } from '@/app/admin/actions';
 const links = [
@@ -21,6 +22,7 @@ const links = [
   { href: '/admin/orders', label: 'Order requests', icon: ClipboardList },
   { href: '/admin/shipping', label: 'Shipping', icon: Truck },
   { href: '/admin/content', label: 'More content', icon: FileText },
+  { href: '/admin/notifications', label: 'Notifications', icon: Bell },
 ];
 export function AdminShell({ email, children }: { email: string; children: React.ReactNode }) {
   const path = usePathname();

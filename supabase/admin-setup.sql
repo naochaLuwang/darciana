@@ -93,7 +93,7 @@ begin
   end if;
   candidate := jsonb_populate_record(null::public.products, p_product || jsonb_build_object('id',saved_product_id,'currency','INR','category_id',category_ids[1]));
   if not candidate.has_variants then
-    if jsonb_array_length(variants) <> 1 or candidate.base_price is null or candidate.base_price not between 0 and 1000000 or round(candidate.base_price,2) <> candidate.base_price then raise exception 'INVALID_PRICE'; end if;
+    if jsonb_array_length(variants) <> 1 or candidate.base_price is null or candidate.base_price not between 0 and 1000000 or round(candidate.base_price,0) <> candidate.base_price then raise exception 'INVALID_PRICE'; end if;
   else candidate.base_price := null; candidate.discount_type := 'none'; candidate.discount_value := 0; end if;
   if coalesce(candidate.discount_type::text,'') not in ('none','amount','percentage') or candidate.discount_value is null or candidate.discount_value not between 0 and 1000000
     or (candidate.discount_type::text = 'percentage' and candidate.discount_value > 100)
@@ -108,7 +108,7 @@ begin
   for option_json in select value from jsonb_array_elements(variants) loop
     option_row := jsonb_populate_record(null::public.product_variants,option_json || jsonb_build_object('currency','INR'));
     if coalesce(length(btrim(option_row.title)),0) not between 1 and 200 or coalesce(length(btrim(option_row.sku)),0) not between 1 and 1000
-      or option_row.price is null or option_row.price not between 0 and 1000000 or round(option_row.price,2) <> option_row.price
+      or option_row.price is null or option_row.price not between 0 and 1000000 or round(option_row.price,0) <> option_row.price
       or jsonb_typeof(option_json->'stock') is distinct from 'number' or coalesce(option_json->>'stock','') !~ '^[0-9]+$' or option_row.stock not between 0 and 1000000
       or jsonb_typeof(option_json->'is_default') is distinct from 'boolean'
       or (coalesce(option_row.image_url,'') <> '' and (option_row.image_url !~ '^https://' or length(option_row.image_url) > 2048))

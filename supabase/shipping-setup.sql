@@ -38,7 +38,8 @@ begin
     or jsonb_typeof(p_area->'price') is distinct from 'number'
     or jsonb_typeof(p_area->'is_active') is distinct from 'boolean' then raise exception 'INVALID_AREA'; end if;
   area_price := (p_area->>'price')::numeric;
-  if area_price not between 0 and 100000 or round(area_price,2)<>area_price then raise exception 'INVALID_PRICE'; end if;
+  if area_price not between 0 and 100000 then raise exception 'INVALID_PRICE'; end if;
+  area_price := round(area_price, 0);
   if area_id is null then
     insert into public.storefront_shipping_areas(name,price,is_active) values(area_name,area_price,(p_area->>'is_active')::boolean) returning id into area_id;
   else
@@ -105,6 +106,7 @@ begin
   if coalesce(p_shipping->>'area_id','') = '' then raise exception 'AREA_REQUIRED'; end if;
   select * into delivery from public.storefront_shipping_areas where id=(p_shipping->>'area_id')::uuid and is_active for share;
   if not found then raise exception 'AREA_UNAVAILABLE'; end if;
+  delivery.price := round(delivery.price, 0);
   if jsonb_typeof(p_shipping->'expected_price') is distinct from 'number' or delivery.price is distinct from (p_shipping->>'expected_price')::numeric then raise exception 'SHIPPING_PRICE_CHANGED'; end if;
 
   -- Lock in a stable order to avoid deadlocks. Prices always come from the DB.
@@ -128,7 +130,7 @@ begin
     if raw_price is null or raw_price < 0 or raw_price::text in ('NaN','Infinity','-Infinity') then raise exception 'UNAVAILABLE'; end if;
     unit_price := round(greatest(0, case discount_kind
       when 'percentage' then raw_price * (1 - discount_amount / 100)
-      when 'amount' then raw_price - discount_amount else raw_price end), 2);
+      when 'amount' then raw_price - discount_amount else raw_price end), 0);
     total := total + unit_price * quantity;
     snapshot := snapshot || jsonb_build_array(jsonb_build_object(
       'product_id', product.id, 'variant_id', variant.id, 'name', product.name,

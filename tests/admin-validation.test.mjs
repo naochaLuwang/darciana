@@ -32,6 +32,16 @@ test('admin inputs reject invalid prices, discounts, duplicate options and unsaf
   };
   assert.equal(productSchema.safeParse(product).success, true);
   assert.equal(productSchema.safeParse({ ...product, base_price: 12.345 }).success, false);
+  assert.equal(productSchema.safeParse({ ...product, base_price: 12.5 }).success, false);
+  assert.equal(
+    productSchema.safeParse({ ...product, discount_type: 'amount', discount_value: 10.5 }).success,
+    false,
+  );
+  assert.equal(
+    productSchema.safeParse({ ...product, discount_type: 'percentage', discount_value: 12.5 })
+      .success,
+    true,
+  );
   assert.equal(
     productSchema.safeParse({ ...product, discount_type: 'percentage', discount_value: 101 })
       .success,

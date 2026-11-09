@@ -19,7 +19,11 @@ await walk(dist);
 const env = existsSync(resolve(root, '.env.local'))
   ? parseEnv(await readFile(resolve(root, '.env.local'), 'utf8'))
   : {};
-const secrets = ['SUPABASE_SECRET_KEY', 'SUPABASE_SERVICE_ROLE_KEY']
+const secrets = [
+  'SUPABASE_SECRET_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'FIREBASE_SERVICE_ACCOUNT_BASE64',
+]
   .map((key) => process.env[key] || env[key])
   .filter(Boolean);
 const scripts = files.filter((file) => file.endsWith('.js'));
@@ -35,7 +39,9 @@ for (const file of scripts) {
     'A secret API key was found in mobile assets.',
   );
   assert.ok(
-    !/SUPABASE_SECRET_KEY|next\/headers|next\/cache|next\/server/.test(code),
+    !/SUPABASE_SECRET_KEY|FIREBASE_SERVICE_ACCOUNT_BASE64|BEGIN PRIVATE KEY|firebase-adminsdk|next\/headers|next\/cache|next\/server/.test(
+      code,
+    ),
     'Server-only code was found in mobile assets.',
   );
 }

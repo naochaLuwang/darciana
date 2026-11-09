@@ -10,12 +10,31 @@ import { supabase } from './supabase';
 import { queryClient, refreshScreens } from './query';
 import { completeAuthCallback } from './auth-flow';
 import { updateConnection } from './network';
+import { useSession } from './session';
+import { restorePush } from './push';
 
 export function Runtime({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [online, setOnline] = useState(navigator.onLine);
   const [message, setMessage] = useState('');
+  const { user, ready } = useSession();
+  useEffect(() => {
+    if (!ready) return;
+    const sync = () => {
+      void restorePush(user?.id ?? null);
+    };
+    sync();
+    window.addEventListener('online', sync);
+    const onActive = () => {
+      if (document.visibilityState === 'visible') sync();
+    };
+    document.addEventListener('visibilitychange', onActive);
+    return () => {
+      window.removeEventListener('online', sync);
+      document.removeEventListener('visibilitychange', onActive);
+    };
+  }, [ready, user?.id]);
 
   useEffect(() => {
     const listener = (event: Event) => {

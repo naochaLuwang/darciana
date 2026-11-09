@@ -47,7 +47,7 @@ The UI and database scripts are implemented. Read-only inspection confirmed the 
 For a new project, use these setup steps in the [Supabase SQL Editor](https://supabase.com/dashboard/project/bcozsouelwdvlkcfxerx/sql/new). Skip scripts already applied to the existing project:
 
 1. If order-request setup is still pending, run [`supabase/setup.sql`](supabase/setup.sql) once. Skip it if `storefront_order_requests` and its submission function are already installed.
-2. Review and run [`supabase/admin-setup.sql`](supabase/admin-setup.sql) once. It adds the private admin registry, validated admin RPCs, activity history, catalog read/write policies, and the public `storefront-media` image bucket.
+2. Review and run [`supabase/admin-setup.sql`](supabase/admin-setup.sql) once. It adds the private admin registry, validated admin RPCs, activity history, catalog read/write policies, and the public `storefront-media` image bucket. Then run [`supabase/product-delete-setup.sql`](supabase/product-delete-setup.sql) to enable permanent product deletion; this upgrade is safe to rerun and does not delete any products when installed.
 3. Ensure `luwangtech0@gmail.com` exists in **Authentication → Users** and has a confirmed email. Use the normal sign-up flow or create/confirm the account in Supabase; use its existing password when signing in.
 4. Run [`supabase/grant-owner.sql`](supabase/grant-owner.sql) to enroll that specific confirmed account. It sets no password and grants no access to other users.
 5. Run [`supabase/shipping-setup.sql`](supabase/shipping-setup.sql) once to install delivery areas, order price snapshots, and the updated checkout validation. Add at least one active area at `/admin/shipping` before opening checkout.
@@ -70,7 +70,7 @@ What the console supports:
 - JPEG/PNG/WebP/AVIF image uploads up to 5 MB, with byte-signature validation and admin-only storage writes. Uploaded images are public storefront assets; replacing a link does not delete an older image. Files uploaded before cancelling a draft remain in Storage for later cleanup.
 - Request delivery details and status transitions: awaiting confirmation → confirmed/cancelled; confirmed → completed/cancelled. Changes require a review checkbox and are recorded in the activity history. Status changes do not collect payment, notify a customer, or reserve/deduct stock.
 
-Existing product options are retained for data integrity; set an unwanted option to zero stock. The console does not provide permanent product/category deletion or admin-user management in the browser.
+Existing options are retained while editing a product; set an unwanted option to zero stock. On `/admin/products`, Delete opens a confirmation dialog requiring `DELETE` before permanently removing the product, all its options, and its category links in one transaction. Saved storefront order snapshots and shared image files remain intact. The database blocks deletion when another integration still references the product or its options, including cascading foreign keys; remove those links or make the product inactive instead. Deletions check for concurrent changes and are recorded in admin activity. Category deletion and admin-user management are not available in the browser.
 
 ## Shipping areas and checkout
 
@@ -197,6 +197,12 @@ tests/                   Commerce, PostgreSQL, and browser verification
 The catalog loads up to 1,000 active INR products per request; add server pagination when the catalog grows beyond that. Favourites and bags belong to the browser, not an account. Product imagery comes from the URLs already stored in Supabase.
 
 ## Deployment
+
+Amounts use whole rupees throughout the app. Apply [the whole-rupee database upgrade](supabase/whole-rupee-setup.sql) before deploying; see [rounding rules](docs/whole-rupee-pricing.md).
+
+Store images use Supabase Storage. See [image storage and uploads](docs/media-storage.md) for admin uploads, artwork updates, and existing legacy image links.
+
+Android push setup and testing: [FCM notifications](docs/push-notifications.md). Deployments using push also require the server-only `FIREBASE_SERVICE_ACCOUNT_BASE64` variable.
 
 Deploy as a Node-compatible Next.js app, configure the two public Supabase environment variables and server-only `SUPABASE_SECRET_KEY`, verify the database setup, and configure the production auth callback URL. Build with `npm run build` and start with `npm start`. This task creates a local app and does not publish a hosted site.
 

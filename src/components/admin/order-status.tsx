@@ -8,6 +8,7 @@ export function OrderStatus({ id, status }: { id: string; status: string }) {
   const [next, setNext] = useState(options[0] ?? '');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [notifyCustomer, setNotifyCustomer] = useState(false);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   if (!options.length)
@@ -24,10 +25,15 @@ export function OrderStatus({ id, status }: { id: string; status: string }) {
         setError('');
         startTransition(async () => {
           try {
-            const result = await saveOrderStatus({ id, expected_status: status, status: next });
+            const result = await saveOrderStatus({
+              id,
+              expected_status: status,
+              status: next,
+              notify_customer: notifyCustomer,
+            });
             if (result.error) setError(result.error);
             else {
-              setMessage('Status updated.');
+              setMessage(result.success ?? 'Status updated.');
               router.refresh();
             }
           } catch {
@@ -50,9 +56,15 @@ export function OrderStatus({ id, status }: { id: string; status: string }) {
         <input type="checkbox" required key={next} />
         <span>I’ve reviewed this request and want to mark it {next}.</span>
       </label>
-      <p className="admin-help">
-        Status changes do not charge the customer, send a message, or change stock.
-      </p>
+      <label className="admin-checkbox">
+        <input
+          type="checkbox"
+          checked={notifyCustomer}
+          onChange={(event) => setNotifyCustomer(event.target.checked)}
+          disabled={pending}
+        />
+        <span>Send the customer a push notification.</span>
+      </label>
       {error ? (
         <p role="alert" className="form-error">
           {error}

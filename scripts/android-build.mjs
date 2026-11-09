@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, writeFile, copyFile } from 'node:fs/promises';
+import { mkdir, writeFile, copyFile, readFile } from 'node:fs/promises';
+import { parseEnv } from 'node:util';
 import { homedir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +10,25 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const task = process.argv[2];
 if (!['assembleDebug', 'assembleRelease', 'bundleRelease'].includes(task))
   throw new Error('Choose an Android build task.');
+let localSigning = {};
+if (task !== 'assembleDebug') {
+  try {
+    localSigning = parseEnv(await readFile(resolve(root, '.secrets/android-release.env'), 'utf8'));
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+}
+const buildEnv = { ...localSigning, ...process.env };
+const signed = Boolean(
+  buildEnv.DACIANA_ANDROID_KEYSTORE &&
+  buildEnv.DACIANA_ANDROID_KEY_ALIAS &&
+  buildEnv.DACIANA_ANDROID_STORE_PASSWORD &&
+  buildEnv.DACIANA_ANDROID_KEY_PASSWORD,
+);
+if (task !== 'assembleDebug' && (!signed || !existsSync(buildEnv.DACIANA_ANDROID_KEYSTORE)))
+  throw new Error(
+    'A release upload keystore and all signing credentials are required. No unsigned Play bundle will be produced.',
+  );
 const sdk =
   process.env.DACIANA_ANDROID_SDK ||
   process.env.ANDROID_HOME ||
@@ -39,7 +59,7 @@ const child = spawn(
   {
     cwd: resolve(root, 'android'),
     stdio: 'inherit',
-    env: { ...process.env, JAVA_HOME: javaHome, ANDROID_HOME: sdk, ANDROID_SDK_ROOT: sdk },
+    env: { ...buildEnv, JAVA_HOME: javaHome, ANDROID_HOME: sdk, ANDROID_SDK_ROOT: sdk },
   },
 );
 const exitCode = await new Promise((resolveCode, reject) => {
@@ -47,12 +67,6 @@ const exitCode = await new Promise((resolveCode, reject) => {
   child.once('exit', (code) => resolveCode(code ?? 1));
 });
 if (exitCode !== 0) process.exit(exitCode);
-const signed = Boolean(
-  process.env.DACIANA_ANDROID_KEYSTORE &&
-  process.env.DACIANA_ANDROID_KEY_ALIAS &&
-  process.env.DACIANA_ANDROID_STORE_PASSWORD &&
-  process.env.DACIANA_ANDROID_KEY_PASSWORD,
-);
 const output =
   task === 'assembleDebug'
     ? ['apk/debug/app-debug.apk', 'daciana-debug.apk']

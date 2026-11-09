@@ -1,6 +1,7 @@
 'use client';
 import { useActionState, useId, useState } from 'react';
 import Link from 'next/link';
+import { StoreImage as Image } from '@/components/store-image';
 import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { authenticate, signInWithGoogle, type AuthState } from '@/app/auth/actions';
 export function AuthForm({ next = '' }: { next?: string }) {
@@ -16,8 +17,15 @@ export function AuthForm({ next = '' }: { next?: string }) {
   return (
     <div className="auth-card">
       <header className="auth-intro">
-        <Link href="/" className="wordmark auth-brand" aria-label="Daciana home">
-          daciana<span aria-hidden="true">✳</span>
+        <Link href="/" className="header-logo auth-brand" aria-label="Daciana home">
+          <Image
+            asset="branding/daciana-logo-transparent.png"
+            alt="Daciana — Stationery & Cosmetics"
+            width={1774}
+            height={887}
+            sizes="355px"
+            loading="eager"
+          />
         </Link>
         <h1>{mode === 'login' ? 'Sign in' : 'Create account'}</h1>
         {next === 'checkout' ? <p>Sign in to checkout.</p> : null}

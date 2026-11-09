@@ -121,7 +121,7 @@ export default async function Account({
                 <div className="order-card-heading">
                   <div>
                     <span className="little-label">
-                      ORDER #{order.id.slice(0, 8).toUpperCase()}
+                      Order #{order.id.slice(0, 8).toUpperCase()}
                     </span>
                     <p>
                       {new Date(order.created_at).toLocaleDateString('en-IN', {

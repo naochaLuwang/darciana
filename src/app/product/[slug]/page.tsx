@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { getCatalog } from '@/lib/catalog';
 import { ProductDetail } from '@/components/product-detail';
 import { ProductCard } from '@/components/product-card';
+import { getProductMedia } from '@/lib/product-media-server';
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const { products } = await getCatalog();
@@ -21,6 +22,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
     );
   const product = products.find((product) => product.slug === slug);
   if (!product) notFound();
+  const gallery = await getProductMedia(product.id);
   const related = products
     .filter(
       (item) =>
@@ -38,7 +40,12 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
         <span>/</span>
         <span>{product.brand || product.name}</span>
       </nav>
-      <ProductDetail product={product} />
+      <ProductDetail
+        key={product.id}
+        product={product}
+        media={gallery.media}
+        mediaError={gallery.error}
+      />
       {related.length ? (
         <section className="section-space">
           <div className="section-heading">

@@ -31,11 +31,20 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     addresses,
     addressesUnavailable,
     failAddressSave;
-  let profiles, addressBook, deletedUsers, siteSettings, oauthChallenges, oauthDenied;
+  let profiles,
+    addressBook,
+    deletedUsers,
+    siteSettings,
+    oauthChallenges,
+    oauthDenied,
+    galleryUnavailable,
+    storageObjects;
   const timestamp = () => new Date().toISOString();
   function reset() {
+    storageObjects = new Map();
     oauthChallenges = new Map();
     oauthDenied = false;
+    galleryUnavailable = false;
     siteSettings = [
       {
         id: '77777777-7777-4777-8777-777777777771',
@@ -181,6 +190,65 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
       reset();
       return reply(200, {});
     }
+    if (path === '/__gallery') {
+      const image = (name, position) => ({
+        id: `image-${name}`,
+        url: `https://images.example.test/${name}.png`,
+        position,
+        alt: name.replaceAll('-', ' '),
+      });
+      const simple = products[0];
+      simple.thumbnail_url = image('simple-front', 0).url;
+      simple.product_images = [
+        image('simple-detail', 2),
+        image('simple-front', 0),
+        image('simple-back', 1),
+        { ...image('simple-front', 3), id: 'duplicate-front' },
+      ];
+      simple.product_variants[0].image_url = simple.thumbnail_url;
+      simple.product_variants[0].variant_images = [];
+      const makeVariant = (id, title, count) => ({
+        ...simple.product_variants[0],
+        id,
+        title,
+        sku: title.toUpperCase(),
+        is_default: title === 'Rose',
+        image_url: count ? image(`${title.toLowerCase()}-front`, 0).url : null,
+        variant_images: count
+          ? [
+              image(`${title.toLowerCase()}-back`, 1),
+              image(`${title.toLowerCase()}-front`, 0),
+              ...(count > 2 ? [image(`${title.toLowerCase()}-detail`, 2)] : []),
+            ]
+          : [],
+      });
+      products.push({
+        ...simple,
+        id: '99999999-9999-4999-8999-999999999999',
+        name: 'Colour pencil set',
+        slug: 'colour-pencil-set',
+        has_variants: true,
+        base_price: null,
+        thumbnail_url: image('shared-product', 0).url,
+        product_images: [image('shared-product', 0)],
+        product_variants: [
+          makeVariant('99999999-9999-4999-8999-999999999991', 'Rose', 2),
+          makeVariant('99999999-9999-4999-8999-999999999992', 'Mint', 3),
+          makeVariant('99999999-9999-4999-8999-999999999993', 'Sand', 0),
+        ],
+      });
+      return reply(200, {});
+    }
+    if (path === '/__gallery/unavailable' || path === '/__gallery/available') {
+      galleryUnavailable = path.endsWith('/unavailable');
+      return reply(200, {});
+    }
+    if (
+      path === '/rest/v1/products' &&
+      galleryUnavailable &&
+      url.searchParams.get('select')?.includes('product_images')
+    )
+      return reply(403, { code: '42501', message: 'Gallery fixture unavailable' });
     if (path === '/__areas/empty') {
       areas = [];
       return reply(200, {});
@@ -237,12 +305,30 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     } catch {}
     if (path === '/auth/v1/user')
       return user ? reply(200, user) : reply(401, { message: 'Invalid token' });
-    let raw = '';
-    for await (const chunk of req) raw += chunk;
+    const chunks = [];
+    for await (const chunk of req) chunks.push(Buffer.from(chunk));
+    const rawBytes = Buffer.concat(chunks);
+    const raw = rawBytes.toString('utf8');
     let args = {};
     try {
       args = JSON.parse(raw || '{}');
     } catch {}
+    if (path.startsWith('/storage/v1/object/public/storefront-media/')) {
+      const key = decodeURIComponent(
+        path.slice('/storage/v1/object/public/storefront-media/'.length),
+      );
+      const object = storageObjects.get(key);
+      if (!object) return reply(404, { message: 'Image not found' });
+      res.writeHead(200, { 'Content-Type': object.contentType });
+      return res.end(object.bytes);
+    }
+    if (path.startsWith('/storage/v1/object/storefront-media/') && req.method === 'POST') {
+      if (user?.id !== OWNER) return reply(403, { message: 'Denied' });
+      const key = decodeURIComponent(path.slice('/storage/v1/object/storefront-media/'.length));
+      if (storageObjects.has(key)) return reply(409, { message: 'Already exists' });
+      storageObjects.set(key, { bytes: rawBytes, contentType: req.headers['content-type'] });
+      return reply(200, { Id: randomUUID(), Key: `storefront-media/${key}` });
+    }
     if (path === '/functions/v1/delete-account') {
       const handler = createDeleteAccountHandler({
         url: 'http://fixture',
@@ -498,6 +584,17 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
         categories.push({ ...p, id });
         record('category_saved', id, p.name);
         return reply(200, id);
+      }
+      if (rpc === 'storefront_admin_delete_product') {
+        const product = products.find((item) => item.id === args.p_product_id);
+        if (args.p_confirmation !== 'DELETE')
+          return reply(400, { code: 'P0001', message: 'INVALID_DELETE_CONFIRMATION' });
+        if (!product) return reply(400, { code: 'P0001', message: 'NOT_FOUND' });
+        if (product.updated_at !== args.p_expected_updated_at)
+          return reply(400, { code: 'P0001', message: 'CONFLICT' });
+        products = products.filter((item) => item.id !== product.id);
+        record('product_deleted', product.id, product.name);
+        return reply(200, product.id);
       }
       if (rpc === 'storefront_admin_set_stock') {
         for (const p of products) {

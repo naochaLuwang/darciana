@@ -127,7 +127,7 @@ export function ShopProvider({
     lines,
     saved,
     count: items.reduce((sum, item) => sum + item.quantity, 0),
-    total: Math.round(lines.reduce((sum, line) => sum + line.price * line.quantity, 0) * 100) / 100,
+    total: lines.reduce((sum, line) => sum + line.price * line.quantity, 0),
     add,
     update,
     clear: () => {

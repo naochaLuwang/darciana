@@ -3,6 +3,38 @@ import type { Category, Product } from './commerce';
 import type { SavedAddress } from './address';
 import type { DeliveryArea } from './shipping';
 import { buildContentPages, type SettingRow } from './store-content';
+import type { GalleryRow, ProductMediaResult } from './product-media';
+import { roundRupees } from './money';
+
+export async function readProductMedia(
+  db: SupabaseClient,
+  productId: string,
+): Promise<ProductMediaResult> {
+  const { data, error } = await db
+    .from('products')
+    .select(
+      'product_images(id,url,alt,position),product_variants(id,variant_images(id,url,alt,position))',
+    )
+    .eq('id', productId)
+    .eq('status', 'active')
+    .maybeSingle();
+  if (error || !data) {
+    if (error) console.error('Product gallery request failed', error.code);
+    return { media: null, error: 'More photos couldn’t load.' };
+  }
+  return {
+    media: {
+      images: (data.product_images ?? []) as GalleryRow[],
+      variants: Object.fromEntries(
+        (data.product_variants ?? []).map((variant) => [
+          variant.id,
+          (variant.variant_images ?? []) as GalleryRow[],
+        ]),
+      ),
+    },
+    error: null,
+  };
+}
 
 export async function readCatalog(db: SupabaseClient) {
   const [products, categories] = await Promise.all([
@@ -98,7 +130,10 @@ export async function readDeliveryAreas(
     console.error('Delivery areas could not load', error.code);
     return { areas: [], error: 'Delivery areas could not load. Refresh the page to try again.' };
   }
-  return { areas: data ?? [], error: null };
+  return {
+    areas: (data ?? []).map((area) => ({ ...area, price: roundRupees(area.price) })),
+    error: null,
+  };
 }
 
 export async function readStoreContent(db: SupabaseClient) {

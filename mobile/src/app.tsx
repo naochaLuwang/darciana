@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { HashRouter, Route, Routes, useLocation, useParams, useNavigate } from 'react-router-dom';
 import { Header, BottomNav, ViewportBehavior } from '@/components/shell';
 import { ShopProvider } from '@/components/shop-provider';
-import Loading from '@/app/loading';
+import { ScreenSkeleton } from '@/components/screen-skeleton';
 import NotFound from '@/app/not-found';
 import { fetchCatalog } from './data';
 import { Runtime } from './runtime';
@@ -91,6 +91,12 @@ function Screen({ name }: { name: ScreenName }) {
   const location = useLocation();
   const params = useParams();
   const navigate = useNavigate();
+  const skeleton =
+    ready && !user && name === 'account'
+      ? 'signin'
+      : ready && !user && name === 'checkout'
+        ? 'checkout-signin'
+        : name;
   const screen = useQuery({
     queryKey: ['screen', user?.id ?? 'guest', location.pathname, location.search],
     queryFn: () => renderScreen(name, params.slug ?? '', location.search),
@@ -103,9 +109,9 @@ function Screen({ name }: { name: ScreenName }) {
   }, [screen.error, navigate]);
   if (sessionError) return <RetryScreen message={sessionError} />;
   if (screen.error instanceof RouteNotFound) return <NotFound />;
-  if (screen.error instanceof RouteRedirect) return <Loading />;
+  if (screen.error instanceof RouteRedirect) return <ScreenSkeleton screen={skeleton} />;
   if (screen.isError) return <RetryScreen />;
-  if (!ready || screen.isPending) return <Loading />;
+  if (!ready || screen.isPending) return <ScreenSkeleton screen={skeleton} />;
   return screen.data;
 }
 
@@ -128,7 +134,7 @@ function Storefront() {
               path="/bag"
               element={
                 catalog.isPending ? (
-                  <Loading />
+                  <ScreenSkeleton screen="bag" />
                 ) : catalog.data?.error ? (
                   <RetryScreen />
                 ) : (
@@ -143,7 +149,7 @@ function Storefront() {
               path="/checkout"
               element={
                 catalog.isPending ? (
-                  <Loading />
+                  <ScreenSkeleton screen="checkout" />
                 ) : catalog.data?.error ? (
                   <RetryScreen />
                 ) : (
@@ -153,7 +159,7 @@ function Storefront() {
             />
             <Route path="/more" element={<Screen name="more" />} />
             <Route path="/more/:slug" element={<Screen name="information" />} />
-            <Route path="/auth/callback" element={<Loading />} />
+            <Route path="/auth/callback" element={<ScreenSkeleton screen="auth" />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </div>

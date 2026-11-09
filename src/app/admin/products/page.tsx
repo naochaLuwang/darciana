@@ -4,6 +4,7 @@ import { adminSession, adminProductSelect, normalizeAdminProduct } from '@/lib/a
 import { money, startingPrice } from '@/lib/commerce';
 import { AdminHeading, AdminNotice, Pagination, pageNumber } from '@/components/admin/common';
 import { ProductImage } from '@/components/product-card';
+import { DeleteProduct } from '@/components/admin/delete-product';
 export const metadata = { title: 'Products' };
 export default async function AdminProducts({
   searchParams,
@@ -68,7 +69,7 @@ export default async function AdminProducts({
                   <th>Stock</th>
                   <th>Options</th>
                   <th>
-                    <span className="sr-only">Edit</span>
+                    <span className="sr-only">Actions</span>
                   </th>
                 </tr>
               </thead>
@@ -98,9 +99,16 @@ export default async function AdminProducts({
                     </td>
                     <td>{product.product_variants.length}</td>
                     <td>
-                      <Link className="text-link" href={`/admin/products/${product.id}`}>
-                        Edit →
-                      </Link>
+                      <div className="admin-product-actions">
+                        <Link className="text-link" href={`/admin/products/${product.id}`}>
+                          Edit →
+                        </Link>
+                        <DeleteProduct
+                          id={product.id}
+                          name={product.name}
+                          updatedAt={product.updated_at}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}

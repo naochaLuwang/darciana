@@ -1,3 +1,6 @@
+import { roundRupees } from './money.ts';
+export { money, roundRupees } from './money.ts';
+
 export type Category = {
   id: string;
   name: string;
@@ -37,17 +40,15 @@ export type CartItem = { productId: string; variantId: string; quantity: number 
 export type CartLine = CartItem & { product: Product; variant: Variant; price: number };
 export function discountedPrice(price: number, type: string, value: number) {
   const discount = Math.max(0, Number.isFinite(value) ? value : 0);
-  return (
-    Math.round(
-      Math.max(
-        0,
-        type === 'percentage'
-          ? price * (1 - discount / 100)
-          : type === 'amount'
-            ? price - discount
-            : price,
-      ) * 100,
-    ) / 100
+  return roundRupees(
+    Math.max(
+      0,
+      type === 'percentage'
+        ? price * (1 - discount / 100)
+        : type === 'amount'
+          ? price - discount
+          : price,
+    ),
   );
 }
 export function variantPrice(product: Product, variant: Variant) {
@@ -64,12 +65,6 @@ export function startingPrice(product: Product) {
     ? Math.min(...product.product_variants.map((variant) => variantPrice(product, variant)))
     : discountedPrice(product.base_price ?? 0, product.discount_type, product.discount_value);
 }
-export const money = (amount: number) =>
-  new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 2,
-  }).format(amount);
 export function parseCart(value: unknown): CartItem[] {
   if (!Array.isArray(value)) return [];
   const seen = new Set<string>();

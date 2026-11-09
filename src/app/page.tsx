@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { ArrowRight, Search, Sparkles, Flower2, BookOpen, Grid2X2 } from 'lucide-react';
+import { StoreImage as Image } from '@/components/store-image';
+import { ArrowRight, Search, Clock3, Droplets, BookOpen, Grid2X2, PackageOpen } from 'lucide-react';
 import { getCatalog } from '@/lib/catalog';
 import { ProductCard } from '@/components/product-card';
 import { categoryTreeIds, type Product } from '@/lib/commerce';
@@ -44,10 +45,10 @@ export default async function Home() {
     ).values(),
   ].slice(0, 8);
   const shortcuts = [
-    { title: 'Shop all', href: '/shop', icon: Grid2X2, color: 'lilac' },
-    { title: 'Cosmetics', href: '/shop?category=cosmetics', icon: Flower2, color: 'pink' },
-    { title: 'Stationery', href: '/shop?category=stationery', icon: BookOpen, color: 'green' },
-    { title: 'New arrivals', href: '/shop?sort=newest', icon: Sparkles, color: 'peach' },
+    { title: 'Shop all', href: '/shop', icon: Grid2X2, tone: 'all' },
+    { title: 'Cosmetics', href: '/shop?category=cosmetics', icon: Droplets, tone: 'beauty' },
+    { title: 'Stationery', href: '/shop?category=stationery', icon: BookOpen, tone: 'paper' },
+    { title: 'New arrivals', href: '/shop?sort=newest', icon: Clock3, tone: 'new' },
   ];
   return (
     <main id="main" className="home-screen page-width">
@@ -63,7 +64,6 @@ export default async function Home() {
             )}
           </h1>
         </div>
-        <Flower2 size={29} strokeWidth={1.4} />
       </div>
       <div className="home-discovery">
         <form action="/shop" className="app-search">
@@ -80,10 +80,10 @@ export default async function Home() {
           </button>
         </form>
         <nav className="home-shortcuts" aria-label="Shop collections">
-          {shortcuts.map(({ title, href, icon: Icon, color }) => (
+          {shortcuts.map(({ title, href, icon: Icon, tone }) => (
             <Link key={title} href={href}>
-              <span className={`shortcut-icon ${color}`}>
-                <Icon size={26} strokeWidth={1.5} />
+              <span className={`shortcut-icon shortcut-${tone}`}>
+                <Icon size={24} strokeWidth={1.5} />
               </span>
               <span>{title}</span>
             </Link>
@@ -91,35 +91,32 @@ export default async function Home() {
         </nav>
       </div>
       <Link href="/shop" className="home-campaign">
+        <Image
+          asset="collections/everyday-edit.webp"
+          alt="A lipstick, blush compact and colorful notebooks arranged on a pink backdrop"
+          fill
+          sizes="(max-width: 1160px) 100vw, 1096px"
+          loading="eager"
+          fetchPriority="high"
+          unoptimized
+          className="campaign-photo"
+        />
         <div className="campaign-copy">
+          <span className="campaign-kicker">Cosmetics & stationery</span>
           <h2>
-            Everyday
+            Beauty &
             <br />
-            essentials.
+            bright ideas
           </h2>
           <span className="campaign-cta">
             Shop now <ArrowRight size={15} />
           </span>
         </div>
-        <div className="campaign-art" aria-hidden="true">
-          <span className="campaign-orbit" />
-          <div className="campaign-notebook">
-            <span>
-              <em>notes</em>
-            </span>
-          </div>
-          <div className="campaign-lipstick">
-            <span />
-            <div />
-            <small>daciana</small>
-          </div>
-          <Flower2 className="campaign-flower" size={33} strokeWidth={1.1} />
-        </div>
       </Link>
       <section className="home-picks" aria-labelledby="picks">
         <div className="section-heading">
           <div>
-            <h2 id="picks">Explore products</h2>
+            <h2 id="picks">Find your favourites</h2>
           </div>
           <Link href="/shop" className="text-link">
             View all <ArrowRight size={15} />
@@ -131,17 +128,77 @@ export default async function Home() {
           </div>
         ) : picks.length ? (
           <div className="product-grid">
-            {picks.map((product, index) => (
+            {picks.slice(0, 4).map((product, index) => (
               <ProductCard key={product.id} product={product} index={index} eager={index < 4} />
             ))}
           </div>
         ) : (
           <div className="empty-state">
-            <Sparkles />
-            <h2>No products available.</h2>
+            <PackageOpen size={32} strokeWidth={1.5} />
+            <h2>No products available</h2>
           </div>
         )}
       </section>
+      <section className="home-collections" aria-labelledby="collections-title">
+        <div className="section-heading">
+          <h2 id="collections-title">Two worlds. One shop.</h2>
+        </div>
+        <div className="collection-grid">
+          <Link href="/shop?category=cosmetics" className="collection-card collection-beauty">
+            <div className="collection-copy">
+              <span>Cosmetics</span>
+              <h3>Your beauty edit</h3>
+              <span className="collection-link">
+                Explore <ArrowRight size={16} />
+              </span>
+            </div>
+            <div className="collection-art" aria-hidden="true">
+              <Image
+                asset="collections/beauty-edit.webp"
+                alt=""
+                fill
+                sizes="(min-width: 600px) 280px, 180px"
+                unoptimized
+                className="collection-photo"
+              />
+            </div>
+          </Link>
+          <Link href="/shop?category=stationery" className="collection-card collection-paper">
+            <div className="collection-copy">
+              <span>Stationery</span>
+              <h3>Make room for ideas</h3>
+              <span className="collection-link">
+                Explore <ArrowRight size={16} />
+              </span>
+            </div>
+            <div className="collection-art" aria-hidden="true">
+              <Image
+                asset="collections/stationery-edit.webp"
+                alt=""
+                fill
+                sizes="(min-width: 600px) 280px, 180px"
+                unoptimized
+                className="collection-photo"
+              />
+            </div>
+          </Link>
+        </div>
+      </section>
+      {!error && picks.length > 4 ? (
+        <section className="home-picks" aria-labelledby="more-products">
+          <div className="section-heading">
+            <h2 id="more-products">More to explore</h2>
+            <Link href="/shop" className="text-link">
+              View all <ArrowRight size={15} />
+            </Link>
+          </div>
+          <div className="product-grid">
+            {picks.slice(4).map((product, index) => (
+              <ProductCard key={product.id} product={product} index={index} />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }

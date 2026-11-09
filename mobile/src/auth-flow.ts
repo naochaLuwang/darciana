@@ -6,6 +6,7 @@ import { authStorage } from './storage';
 import { supabase, authStorageKey } from './supabase';
 import { clearPrivateScreens, refreshScreens } from './query';
 import { navigateApp, notify } from './navigation';
+import { disablePush } from './push';
 
 const flowKey = 'daciana.oauth-flow.v1';
 const flowSchema = z.object({
@@ -60,6 +61,7 @@ export async function beginGoogleSignIn(next: string, deleteUserId?: string) {
 }
 
 export async function clearLocalSession() {
+  await disablePush().catch(() => {});
   supabase.auth.stopAutoRefresh();
   await authStorage.removeItem(authStorageKey);
   await authStorage.removeItem(`${authStorageKey}-code-verifier`);

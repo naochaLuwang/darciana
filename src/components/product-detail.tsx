@@ -2,10 +2,19 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Heart, Minus, Plus, ShoppingBag, Check, Package } from 'lucide-react';
-import { money, variantPrice, type Product } from '@/lib/commerce';
-import { ProductImage } from './product-card';
+import { money, roundRupees, variantPrice, type Product } from '@/lib/commerce';
+import { ProductGallery } from './product-gallery';
+import { productGallery, type ProductMedia } from '@/lib/product-media';
 import { useShop } from './shop-provider';
-export function ProductDetail({ product }: { product: Product }) {
+export function ProductDetail({
+  product,
+  media = null,
+  mediaError,
+}: {
+  product: Product;
+  media?: ProductMedia | null;
+  mediaError?: string | null;
+}) {
   const { add, saved, toggleSaved } = useShop();
   const [selectedId, setSelectedId] = useState(
     product.product_variants.find((variant) => variant.stock > 0 && variant.is_default)?.id ??
@@ -15,18 +24,21 @@ export function ProductDetail({ product }: { product: Product }) {
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const variant = product.product_variants.find((variant) => variant.id === selectedId);
-  const price = variant ? variantPrice(product, variant) : (product.base_price ?? 0);
-  const original = product.has_variants ? variant?.price : product.base_price;
+  const price = variant ? variantPrice(product, variant) : roundRupees(product.base_price ?? 0);
+  const originalValue = product.has_variants ? variant?.price : product.base_price;
+  const original = originalValue == null ? null : roundRupees(originalValue);
   const stock = variant?.stock ?? 0;
+  const images = productGallery(product, variant, media);
+  const label = `${product.name}${product.has_variants && variant ? ` · ${variant.title.trim()}` : ''}`;
   return (
     <section className="product-detail">
-      <div className="detail-photo tint-0">
-        <ProductImage
-          src={variant?.image_url || product.thumbnail_url}
-          alt={product.name}
-          priority
-        />
-      </div>
+      <ProductGallery
+        key={product.has_variants ? (variant?.id ?? product.id) : product.id}
+        images={images}
+        label={label}
+        variant={product.has_variants}
+        error={mediaError}
+      />
       <div className="detail-copy">
         {product.brand ? <span className="eyebrow">{product.brand}</span> : null}
         <h1>{product.name}</h1>
@@ -34,7 +46,7 @@ export function ProductDetail({ product }: { product: Product }) {
           {money(price)}
           {original && original > price ? <del>{money(original)}</del> : null}
         </div>
-        <p className="tax-note">Taxes included.</p>
+        <p className="tax-note">Taxes included</p>
         <p className={`stock-label ${stock > 0 ? '' : 'muted'}`}>
           <span />
           {stock > 0 ? `In stock${stock < 6 ? ` · Only ${stock} left` : ''}` : 'Sold out'}
@@ -120,7 +132,7 @@ export function ProductDetail({ product }: { product: Product }) {
         ) : null}
         <div className="detail-delivery">
           <Package size={19} />
-          <p>Delivery fee shown at checkout. </p>
+          <p>Delivery fee at checkout</p>
         </div>
       </div>
     </section>

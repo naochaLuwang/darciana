@@ -74,7 +74,7 @@ export function DeliveryAreaSelect({
           enterKeyHint="done"
           disabled={disabled}
           value={open ? query : (selected?.name ?? '')}
-          placeholder={selected && open ? selected.name : 'Search and select your area'}
+          placeholder={selected && open ? selected.name : 'Search delivery areas'}
           onFocus={() => {
             setOpen(true);
             setQuery('');
