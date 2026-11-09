@@ -54,7 +54,7 @@ export async function checkProductGalleries(
   await page.getByRole('button', { name: 'Rose', exact: true }).click();
   await expect(activeImage()).toHaveAttribute('src', /rose-front\.png$/);
   await expect(gallery.locator('.gallery-count')).toHaveText('1 / 2');
-  await page.getByRole('button', { name: 'Sand', exact: true }).click();
+  await page.getByRole('button', { name: 'Sand · Sold out', exact: true }).click();
   await expect(gallery.getByText('Photos unavailable for this option')).toHaveCount(0);
   await expect(thumbnails()).toHaveCount(2);
   await expect(activeImage()).toHaveAttribute('src', /shared-product\.png$/);
@@ -62,14 +62,41 @@ export async function checkProductGalleries(
   await expect(gallery.locator('img[src*="mint-"]')).toHaveCount(0);
   await gallery.getByRole('button', { name: 'Next photo', exact: true }).click();
   await expect(activeImage()).toHaveAttribute('src', /shared-detail\.png$/);
+  await expect(page.locator('.detail-availability')).toHaveText('This option is out of stock');
+  await expect(page.getByRole('group', { name: 'Quantity', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Add to bag', exact: true })).toHaveCount(0);
+  const chooseAnother = page.getByRole('button', { name: 'Choose another option', exact: true });
+  await expect(chooseAnother).toBeEnabled();
+  await chooseAnother.click();
+  await expect(page.getByRole('button', { name: 'Rose', exact: true })).toBeFocused();
+  if (native) {
+    await page.screenshot({
+      path: 'artifacts/product-detail-design/variant-sold-out.png',
+      fullPage: false,
+    });
+  }
   await page.getByRole('button', { name: 'Mint', exact: true }).click();
   await expect(activeImage()).toHaveAttribute('src', /mint-front\.png$/);
   await expect(gallery.locator('img[src*="shared-"]')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({
-    path: `test-results/${native ? 'native' : 'web'}-product-gallery-mobile.png`,
-    fullPage: true,
-  });
+  await expect(page.locator('.detail-availability')).toHaveText('In stock · 4 left');
+  await expect(page.getByRole('group', { name: 'Quantity', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add to bag', exact: true })).toBeEnabled();
+  const buy = await page.locator('.detail-buy').boundingBox();
+  const nav = await page
+    .getByRole('navigation', { name: 'App navigation', exact: true })
+    .boundingBox();
+  expect(buy!.y + buy!.height).toBeLessThanOrEqual(nav!.y + 1);
+  if (native) {
+    await page.evaluate(() => {
+      (document.activeElement as HTMLElement)?.blur();
+      window.scrollTo(0, 0);
+    });
+    await page.screenshot({
+      path: 'artifacts/product-detail-design/in-stock.png',
+      fullPage: false,
+    });
+  }
   await page.setViewportSize({ width: 320, height: 740 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
@@ -83,4 +110,34 @@ export async function checkProductGalleries(
   await gallery.getByRole('button', { name: 'Retry', exact: true }).click();
   await expect(thumbnails()).toHaveCount(2);
   await expect(gallery.getByText('More photos couldn’t load.')).toHaveCount(0);
+
+  // When every option is sold out, browsing and saving remain possible, buying does not.
+  await request.get('http://127.0.0.1:54329/__gallery/all-sold-out');
+  await page.reload();
+  await expect(page.locator('.detail-availability')).toHaveText('Out of stock');
+  await expect(page.getByRole('button', { name: 'Out of stock', exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'Choose another option', exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByRole('group', { name: 'Quantity', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Sand · Sold out', exact: true }).click();
+  await expect(activeImage()).toHaveAttribute('src', /shared-product\.png$/);
+  await expect(page.getByRole('button', { name: 'Out of stock', exact: true })).toBeDisabled();
+  const save = page.getByRole('button', { name: 'Save product', exact: true });
+  await save.click();
+  await expect(save).toHaveAttribute('aria-pressed', 'true');
+  const hero = await page.locator('.detail-photo').boundingBox();
+  const heart = await save.boundingBox();
+  expect(heart!.x).toBeGreaterThan(hero!.x);
+  expect(heart!.y).toBeGreaterThan(hero!.y);
+  expect(heart!.x + heart!.width).toBeLessThan(hero!.x + hero!.width);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  if (native) {
+    await page.setViewportSize({ width: 393, height: 852 });
+    await page.locator('.detail-copy').scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: 'artifacts/product-detail-design/all-sold-out.png',
+      fullPage: false,
+    });
+  }
 }

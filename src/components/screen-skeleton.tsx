@@ -224,18 +224,27 @@ function Bag() {
 function Product() {
   return (
     <div className="product-detail">
-      <Bone height="auto" className="detail-photo skeleton-square" />
+      <div className="detail-media">
+        <Bone height="auto" className="detail-photo" />
+        <div className="skeleton-row gallery-thumbnails">
+          {[0, 1, 2].map((index) => (
+            <Bone key={index} width={56} height={56} />
+          ))}
+        </div>
+      </div>
       <Stack className="skeleton-section detail-copy">
         <Bone width="25%" height={12} />
         <Bone width="90%" height={28} />
-        <Bone width="70%" height={28} />
-        <Bone width={136} height={32} />
+        <div className="skeleton-row skeleton-between">
+          <Bone width={112} height={32} />
+          <Bone width={100} height={32} />
+        </div>
         <Bone width={112} height={12} />
         <Bone width="40%" height={18} />
         <div className="skeleton-row">
-          <Bone width={48} height={48} />
-          <Bone width={48} height={48} />
-          <Bone width={48} height={48} />
+          <Bone width={80} height={60} />
+          <Bone width={80} height={60} />
+          <Bone width={80} height={60} />
         </div>
         <Bone height={48} />
         <Bone />

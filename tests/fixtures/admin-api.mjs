@@ -223,6 +223,8 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
         title,
         sku: title.toUpperCase(),
         is_default: title === 'Rose',
+        stock: title === 'Sand' ? 0 : 4,
+        hex_code: title === 'Rose' ? '#bd8291' : title === 'Mint' ? '#9bb6a8' : '#d9b995',
         image_url: count ? image(`${title.toLowerCase()}-front`, 0).url : null,
         variant_images: count
           ? [
@@ -247,6 +249,12 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
           makeVariant('99999999-9999-4999-8999-999999999993', 'Sand', 0),
         ],
       });
+      return reply(200, {});
+    }
+    if (path === '/__gallery/all-sold-out') {
+      const product = products.find((item) => item.slug === 'colour-pencil-set');
+      if (!product) return reply(404, { error: 'Load gallery fixtures first.' });
+      for (const variant of product.product_variants) variant.stock = 0;
       return reply(200, {});
     }
     if (path === '/__gallery/unavailable' || path === '/__gallery/available') {
