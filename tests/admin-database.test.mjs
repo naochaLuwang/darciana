@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initializeStoreDatabase } from './fixtures/database.mjs';
 import { PGlite } from '@electric-sql/pglite';
+import { categorySchema } from '../src/lib/admin-validation.ts';
 
 test('admin database operations enforce membership, transactions, stock conflicts and request transitions', async () => {
   const db = new PGlite();
@@ -75,6 +76,31 @@ test('admin database operations enforce membership, transactions, stock conflict
         image_url: '',
       })
     ).rows[0].id;
+    // Legacy catalog data predates the current single-hyphen save constraint.
+    await db.exec('reset role');
+    const legacy = (
+      await db.query(
+        "insert into public.categories(name,slug,parent_id,image_url) values('Arts & Crafts','arts--crafts',$1,'') returning id",
+        [parent],
+      )
+    ).rows[0].id;
+    await login(owner);
+    const legacyImage =
+      'https://example.supabase.co/storage/v1/object/public/storefront-media/categories/arts.webp';
+    const updatedLegacy = categorySchema.parse({
+      id: legacy,
+      name: 'Arts & Crafts',
+      slug: 'arts--crafts',
+      parent_id: parent,
+      image_url: legacyImage,
+    });
+    assert.equal((await category(updatedLegacy)).rows[0].id, legacy);
+    const savedLegacy = (
+      await db.query('select slug,image_url,parent_id from public.categories where id=$1', [legacy])
+    ).rows[0];
+    assert.equal(savedLegacy.slug, 'arts-crafts');
+    assert.equal(savedLegacy.image_url, legacyImage);
+    assert.equal(savedLegacy.parent_id, parent);
     await assert.rejects(
       () =>
         category({

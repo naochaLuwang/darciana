@@ -46,8 +46,14 @@ export function productGallery(
   media: ProductMedia | null,
 ): GalleryImage[] {
   if (product.has_variants) {
-    // Product-wide photos must never leak into a selected option's gallery.
-    return variant ? orderedImages(media?.variants[variant.id], variant.image_url) : [];
+    const selectedImages = variant
+      ? orderedImages(media?.variants[variant.id], variant.image_url)
+      : [];
+    // Use only the selected option's photos when present. Options without photos
+    // fall back to the product gallery, never to another option's photos.
+    return selectedImages.length
+      ? selectedImages
+      : orderedImages(media?.images, product.thumbnail_url);
   }
   const images = orderedImages(media?.images, product.thumbnail_url);
   const seen = new Set(images.map((image) => image.url));

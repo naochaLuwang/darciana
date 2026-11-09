@@ -190,6 +190,16 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
       reset();
       return reply(200, {});
     }
+    if (path === '/__categories/legacy') {
+      categories.push({
+        id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        name: 'ARTS & CRAFTS',
+        slug: 'arts--crafts',
+        parent_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        image_url: '',
+      });
+      return reply(200, {});
+    }
     if (path === '/__gallery') {
       const image = (name, position) => ({
         id: `image-${name}`,
@@ -230,7 +240,7 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
         has_variants: true,
         base_price: null,
         thumbnail_url: image('shared-product', 0).url,
-        product_images: [image('shared-product', 0)],
+        product_images: [image('shared-product', 0), image('shared-detail', 1)],
         product_variants: [
           makeVariant('99999999-9999-4999-8999-999999999991', 'Rose', 2),
           makeVariant('99999999-9999-4999-8999-999999999992', 'Mint', 3),

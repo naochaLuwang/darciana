@@ -45,7 +45,7 @@ test('simple products combine their full gallery with legacy product and standar
   );
 });
 
-test('variant galleries never fall back to product-wide or another option’s photos', () => {
+test('variant galleries isolate existing photos and use product photos for options without images', () => {
   const rose = { id: 'rose', image_url: 'https://example.com/rose-front.jpg' };
   const mint = { id: 'mint', image_url: 'https://example.com/mint-front.jpg' };
   const missing = { id: 'missing', image_url: null };
@@ -69,8 +69,49 @@ test('variant galleries never fall back to product-wide or another option’s ph
     productGallery(product, mint, media).map((image) => image.url),
     [mint.image_url],
   );
-  assert.deepEqual(productGallery(product, missing, media), []);
-  assert.deepEqual(productGallery(product, undefined, media), []);
+  assert.deepEqual(productGallery(product, missing, media), [
+    { url: product.thumbnail_url, alt: null },
+  ]);
+  assert.deepEqual(productGallery(product, undefined, media), [
+    { url: product.thumbnail_url, alt: null },
+  ]);
   assert.deepEqual(productGallery(product, rose, null), [{ url: rose.image_url, alt: null }]);
-  assert.deepEqual(productGallery(product, missing, null), []);
+  assert.deepEqual(productGallery(product, missing, null), [
+    { url: product.thumbnail_url, alt: null },
+  ]);
+});
+
+test('options without photos use the full ordered product gallery and thumbnail, excluding other options', () => {
+  const missing = { id: 'missing', image_url: '' };
+  const other = { id: 'other', image_url: 'https://example.com/other-option.jpg' };
+  const product = {
+    has_variants: true,
+    thumbnail_url: 'https://example.com/thumbnail.jpg',
+    product_variants: [missing, other],
+  };
+  const media = {
+    images: [
+      photo('back', 'https://example.com/back.jpg', 1),
+      photo('front', 'https://example.com/front.jpg', 0),
+    ],
+    variants: { other: [photo('other', other.image_url, 0)] },
+  };
+  assert.deepEqual(
+    productGallery(product, missing, media).map((image) => image.url),
+    ['https://example.com/front.jpg', 'https://example.com/back.jpg', product.thumbnail_url],
+  );
+  assert.deepEqual(
+    productGallery(product, { ...missing, image_url: 'javascript:invalid' }, media).map(
+      (image) => image.url,
+    ),
+    ['https://example.com/front.jpg', 'https://example.com/back.jpg', product.thumbnail_url],
+  );
+  assert.deepEqual(
+    productGallery({ ...product, thumbnail_url: null }, missing, { ...media, images: [] }),
+    [],
+  );
+  assert.deepEqual(
+    productGallery({ ...product, thumbnail_url: null }, missing, media).map((image) => image.url),
+    ['https://example.com/front.jpg', 'https://example.com/back.jpg'],
+  );
 });

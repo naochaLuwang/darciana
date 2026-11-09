@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Search, SlidersHorizontal, Heart, X, ArrowRight } from 'lucide-react';
 import { categoryTreeIds, startingPrice, type Category, type Product } from '@/lib/commerce';
+import { normalizeCategorySlug } from '@/lib/category-slug';
 import { ProductCard } from './product-card';
 import { useShop } from './shop-provider';
 
@@ -23,13 +24,15 @@ export function CatalogBrowser({
   initialSort: string;
   onlySaved: boolean;
 }) {
-  const [category, setCategory] = useState(initialCategory);
+  const [category, setCategory] = useState(normalizeCategorySlug(initialCategory));
   const [search, setSearch] = useState(initialSearch);
   const [sort, setSort] = useState(initialSort || 'newest');
   const [available, setAvailable] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const { saved } = useShop();
-  const selected = categories.find((item) => item.slug === category);
+  const selected = categories.find(
+    (item) => normalizeCategorySlug(item.slug) === normalizeCategorySlug(category),
+  );
   const ids = selected ? categoryTreeIds(categories, selected.id) : [];
   const ordered = products
     .filter(

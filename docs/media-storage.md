@@ -20,6 +20,10 @@ Use **Replace image** to upload a new file or **Remove image** to clear the reco
 
 Product and category server actions accept changed image URLs only from this project's public `storefront-media` bucket. An unchanged legacy URL may be retained when editing unrelated fields. Existing product/variant gallery URLs continue to render through the shared gallery code.
 
+Category editing normalizes case, surrounding spaces and repeated hyphens in slugs before saving. For example, the legacy `arts--crafts` becomes `arts-crafts`, so it no longer blocks an image update. Invalid characters still produce a readable field error. Storefront category filters also recognize the older repeated-hyphen spelling.
+
+On product detail pages, a selected variant with images shows only its own gallery and primary image. A variant without any valid image references falls back to the ordered product gallery and thumbnail. Images from other variants are excluded. The same helper runs in the website and bundled native app; website deployment and rebuilding an installed native binary are separate steps.
+
 ## Branding and homepage artwork
 
 The logo, monogram and three homepage photos are uploaded to Storage. `StoreImage` reads the versioned public paths from `src/lib/store-assets.json`; it uses the bundled original only when Storage fails or the device is offline. Native launcher icons, notification icons and splash resources must remain compiled into the Android app.

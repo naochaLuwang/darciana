@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from 'npm:@supabase/supabase-js@2.118.0';
 import { createDeleteAccountHandler } from './handler.mjs';
 
 function injectedKey(name: string, legacy: string) {

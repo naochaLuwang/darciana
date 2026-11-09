@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { isStoreMediaUrl } from './media.ts';
+import { normalizeCategorySlug } from './category-slug.ts';
 
 const price = z.number().finite().int('Use whole rupees, without decimals.').min(0).max(1000000);
 export const imageUrl = z.union([
@@ -138,10 +139,17 @@ export const categorySchema = z
     name: z.string().trim().min(2).max(120),
     slug: z
       .string()
-      .trim()
-      .min(2)
-      .max(160)
-      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+      .transform(normalizeCategorySlug)
+      .pipe(
+        z
+          .string()
+          .min(2, 'Enter a category slug with at least two characters.')
+          .max(160)
+          .regex(
+            /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+            'Use lowercase letters, numbers, and hyphens for the category slug.',
+          ),
+      ),
     parent_id: z.uuid().nullable(),
     image_url: imageUrl,
   })

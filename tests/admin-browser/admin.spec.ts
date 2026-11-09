@@ -116,6 +116,27 @@ test('admin images upload to Storage, save on products and categories, and can b
   expect(
     categories.find((item: { name: string }) => item.name === 'Storage category').image_url,
   ).toMatch(/\/storefront-media\/categories\//);
+  await request.get('http://127.0.0.1:54329/__categories/legacy');
+  await page.goto('/admin/categories?edit=dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+  await expect(page.getByLabel('URL slug', { exact: true })).toHaveValue('arts-crafts');
+  await page.getByLabel('Upload category image', { exact: true }).setInputFiles(png);
+  await expect(page.locator('.admin-image-preview img')).toHaveAttribute(
+    'src',
+    /\/storefront-media\/categories\//,
+  );
+  await page.getByRole('button', { name: 'Save category', exact: true }).click();
+  await expect(page.getByText('Category saved.', { exact: true })).toBeVisible();
+  const savedCategories = await (
+    await request.get('http://127.0.0.1:54329/rest/v1/categories')
+  ).json();
+  const legacy = savedCategories.find(
+    (item: { id: string }) => item.id === 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+  );
+  expect(legacy.slug).toBe('arts-crafts');
+  expect(legacy.parent_id).toBe('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+  expect(legacy.image_url).toMatch(/\/storefront-media\/categories\//);
+  await page.goto('/shop?category=arts--crafts');
+  await expect(page.getByRole('heading', { name: 'Arts & crafts', exact: true })).toBeVisible();
 });
 test('notification console protects access, previews announcements and disables sending with no subscribers', async ({
   page,

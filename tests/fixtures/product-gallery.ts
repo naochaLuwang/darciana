@@ -55,10 +55,16 @@ export async function checkProductGalleries(
   await expect(activeImage()).toHaveAttribute('src', /rose-front\.png$/);
   await expect(gallery.locator('.gallery-count')).toHaveText('1 / 2');
   await page.getByRole('button', { name: 'Sand', exact: true }).click();
-  await expect(gallery.getByText('Photos unavailable for this option')).toBeVisible();
-  await expect(thumbnails()).toHaveCount(0);
-  await expect(gallery.locator('img[src*="images.example.test"]')).toHaveCount(0);
+  await expect(gallery.getByText('Photos unavailable for this option')).toHaveCount(0);
+  await expect(thumbnails()).toHaveCount(2);
+  await expect(activeImage()).toHaveAttribute('src', /shared-product\.png$/);
+  await expect(gallery.locator('img[src*="rose-"]')).toHaveCount(0);
+  await expect(gallery.locator('img[src*="mint-"]')).toHaveCount(0);
+  await gallery.getByRole('button', { name: 'Next photo', exact: true }).click();
+  await expect(activeImage()).toHaveAttribute('src', /shared-detail\.png$/);
   await page.getByRole('button', { name: 'Mint', exact: true }).click();
+  await expect(activeImage()).toHaveAttribute('src', /mint-front\.png$/);
+  await expect(gallery.locator('img[src*="shared-"]')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({
     path: `test-results/${native ? 'native' : 'web'}-product-gallery-mobile.png`,

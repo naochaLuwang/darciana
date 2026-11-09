@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { saveCategory } from '@/app/admin/actions';
 import { slugify } from '@/lib/admin-validation';
+import { normalizeCategorySlug } from '@/lib/category-slug';
 import { categoryTreeIds, type Category } from '@/lib/commerce';
 import { ImageField } from './image-field';
 export function CategoryEditor({
@@ -14,7 +15,7 @@ export function CategoryEditor({
   categories: Category[];
 }) {
   const [name, setName] = useState(initial?.name ?? '');
-  const [slug, setSlug] = useState(initial?.slug ?? '');
+  const [slug, setSlug] = useState(normalizeCategorySlug(initial?.slug ?? ''));
   const [slugEdited, setSlugEdited] = useState(!!initial);
   const [parent, setParent] = useState(initial?.parent_id ?? '');
   const [image, setImage] = useState(initial?.image_url ?? '');
@@ -68,6 +69,7 @@ export function CategoryEditor({
           required
           maxLength={160}
           value={slug}
+          onBlur={() => setSlug(normalizeCategorySlug(slug))}
           onChange={(event) => {
             setSlugEdited(true);
             setSlug(event.target.value);

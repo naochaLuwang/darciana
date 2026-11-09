@@ -31,5 +31,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "supabase/functions", "mobile", "android"]
+  "exclude": ["node_modules", "supabase/functions", "mobile", "android", "artifacts"]
 }
