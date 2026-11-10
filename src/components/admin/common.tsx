@@ -12,7 +12,6 @@ export function AdminHeading({
   return (
     <div className="admin-page-heading">
       <div>
-        <span className="eyebrow">YOUR STORE, TAKEN CARE OF</span>
         <h1>{title}</h1>
         <p>{description}</p>
       </div>

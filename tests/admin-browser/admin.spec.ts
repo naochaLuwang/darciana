@@ -265,7 +265,14 @@ test('owner can manage products, categories, stock and request status', async ({
 }) => {
   await signIn(context, OWNER);
   await page.goto('/admin');
-  await expect(page.getByRole('heading', { name: 'Your store at a glance' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Store overview' })).toBeVisible();
+  const logo = page
+    .locator('.admin-sidebar')
+    .getByRole('img', { name: 'Daciana — Stationery & Cosmetics' });
+  await expect(logo).toBeVisible();
+  await expect
+    .poll(() => logo.evaluate((image) => (image as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
   await page.screenshot({ path: 'test-results/admin-overview.png', fullPage: true });
   await page.getByRole('link', { name: 'Add product', exact: true }).click();
   await page.getByLabel('Product name', { exact: true }).fill('Peach lip balm');
@@ -316,6 +323,13 @@ test('admin navigation and editor work on a phone', async ({ page, context }) =>
   await signIn(context, OWNER);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/admin');
+  await expect(page.getByRole('heading', { name: 'Store overview' })).toBeVisible();
+  const logo = page
+    .locator('.admin-sidebar')
+    .getByRole('img', { name: 'Daciana — Stationery & Cosmetics' });
+  await expect
+    .poll(() => logo.evaluate((image) => (image as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
   await expect(page.getByRole('navigation', { name: 'Admin navigation' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/admin-mobile.png', fullPage: true });

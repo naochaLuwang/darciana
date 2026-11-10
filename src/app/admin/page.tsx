@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, Plus, Package, Boxes, ClipboardList, IndianRupee } from 'lucide-react';
+import { ArrowRight, Plus, ClipboardList } from 'lucide-react';
 import { adminSession, type AdminOrder } from '@/lib/admin';
 import { money } from '@/lib/commerce';
 import { AdminHeading, AdminNotice, adminDate } from '@/components/admin/common';
@@ -33,28 +33,25 @@ export default async function AdminOverview() {
           label: 'Active products',
           value: data.active_products,
           note: 'Visible in the shop',
-          icon: Package,
           href: '/admin/products?status=active',
         },
         {
           label: 'Low stock options',
           value: data.low_stock,
           note: '5 units or fewer · active products',
-          icon: Boxes,
           href: '/admin/inventory?low=true',
         },
         {
           label: 'Awaiting confirmation',
           value: data.pending_requests,
           note: 'Requests needing your attention',
-          icon: ClipboardList,
+          attention: data.pending_requests > 0,
           href: '/admin/orders?status=awaiting_confirmation',
         },
         {
           label: 'Requested item value',
           value: money(data.requested_value),
           note: 'Last 30 days · excludes cancelled',
-          icon: IndianRupee,
           href: '/admin/orders',
         },
       ]
@@ -62,11 +59,11 @@ export default async function AdminOverview() {
   return (
     <>
       <AdminHeading
-        title="Your store at a glance"
-        description="A clear view of your catalog and the requests that need you."
+        title="Store overview"
+        description="Orders, stock and recent store activity"
         action={
           <Link href="/admin/products/new" className="button button-dark">
-            <Plus size={17} /> Add product
+            <Plus size={18} strokeWidth={1.5} aria-hidden="true" /> Add product
           </Link>
         }
       />
@@ -76,11 +73,12 @@ export default async function AdminOverview() {
         </AdminNotice>
       ) : (
         <div className="admin-stat-grid">
-          {cards.map(({ label, value, note, icon: Icon, href }) => (
-            <Link href={href} className="admin-stat" key={label}>
-              <span className="admin-stat-icon">
-                <Icon size={20} strokeWidth={1.5} />
-              </span>
+          {cards.map(({ label, value, note, attention, href }) => (
+            <Link
+              href={href}
+              className={`admin-stat${attention ? ' admin-stat-attention' : ''}`}
+              key={label}
+            >
               <span>{label}</span>
               <strong>{value}</strong>
               <small>{note}</small>
@@ -93,7 +91,7 @@ export default async function AdminOverview() {
           <div className="admin-panel-heading">
             <h2>Recent order requests</h2>
             <Link href="/admin/orders" className="text-link">
-              View all <ArrowRight size={15} />
+              View all <ArrowRight size={18} strokeWidth={1.5} aria-hidden="true" />
             </Link>
           </div>
           {recent.error ? (
@@ -104,25 +102,32 @@ export default async function AdminOverview() {
             <div className="admin-recent-orders">
               {(recent.data as AdminOrder[]).map((order) => (
                 <Link key={order.id} href={`/admin/orders/${order.id}`}>
-                  <span className="admin-order-initial">{order.shipping.name.slice(0, 1)}</span>
-                  <div>
+                  <span className="admin-order-initial" aria-hidden="true">
+                    {order.shipping.name.slice(0, 1).toUpperCase()}
+                  </span>
+                  <div className="admin-order-summary">
                     <strong>{order.shipping.name}</strong>
-                    <span>
-                      #{order.id.slice(0, 8).toUpperCase()} · {adminDate(order.created_at)}
-                    </span>
+                    <div className="admin-order-meta">
+                      <span className="admin-order-reference">
+                        #{order.id.slice(0, 8).toUpperCase()}
+                      </span>
+                      <time dateTime={order.created_at}>{adminDate(order.created_at)}</time>
+                    </div>
                   </div>
                   <div>
                     <strong>{money(order.order_total ?? order.item_total)}</strong>
-                    <span className="admin-status">{order.status.replaceAll('_', ' ')}</span>
+                    <span className={`admin-status ${order.status}`}>
+                      {order.status.replaceAll('_', ' ')}
+                    </span>
                   </div>
                 </Link>
               ))}
             </div>
           ) : (
             <div className="admin-empty">
-              <ClipboardList size={28} />
+              <ClipboardList size={24} strokeWidth={1.5} aria-hidden="true" />
               <h3>No requests yet</h3>
-              <p>Customer requests will appear here when they arrive.</p>
+              <p>New customer orders will appear here</p>
             </div>
           )}
         </section>
@@ -147,15 +152,15 @@ export default async function AdminOverview() {
             </ul>
           ) : (
             <div className="admin-empty">
-              <h3>A fresh start</h3>
-              <p>Catalog changes and request updates are recorded here.</p>
+              <h3>No recent activity</h3>
+              <p>Catalog and order updates will appear here</p>
             </div>
           )}
         </section>
       </div>
       <div className="admin-information">
-        Requested item value excludes delivery and is not collected revenue. Delivery is set by area
-        at checkout; payment and stock reservation are handled separately.
+        Item value excludes delivery and is not collected revenue. Delivery prices are set by area;
+        payment and stock reservation are handled separately.
       </div>
     </>
   );

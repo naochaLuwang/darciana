@@ -4,8 +4,9 @@ import { AdminShell } from '@/components/admin/admin-shell';
 import { AdminLogin } from '@/components/admin/admin-login';
 import { adminSignOut } from './actions';
 import './admin.css';
+import { AdminBrand } from '@/components/admin/admin-brand';
 export const metadata = {
-  title: { default: 'Store console | Darciana', template: '%s | Darciana Admin' },
+  title: { default: 'Store admin | Daciana', template: '%s | Daciana Admin' },
   robots: { index: false, follow: false },
 };
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -20,7 +21,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <AdminLogin />
           ) : (
             <div className="admin-access-card">
-              <span className="eyebrow">STORE CONSOLE</span>
+              <AdminBrand className="admin-login-brand" />
               <h1>
                 {context.state === 'denied'
                   ? 'Admin access required'

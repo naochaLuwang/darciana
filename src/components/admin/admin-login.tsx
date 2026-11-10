@@ -1,18 +1,16 @@
 'use client';
 import { useActionState } from 'react';
-import { LockKeyhole, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { adminSignIn, type AdminResult } from '@/app/admin/actions';
 import Link from 'next/link';
+import { AdminBrand } from './admin-brand';
 export function AdminLogin() {
   const [state, action, pending] = useActionState<AdminResult, FormData>(adminSignIn, {});
   return (
     <form action={action} className="admin-login-form">
-      <span className="admin-login-icon">
-        <LockKeyhole size={24} />
-      </span>
-      <span className="eyebrow">DARCIANA STORE CONSOLE</span>
-      <h1>A little space to run your store.</h1>
-      <p>Sign in with your approved admin account.</p>
+      <AdminBrand className="admin-login-brand" />
+      <h1>Admin sign in</h1>
+      <p>Use your approved store account</p>
       <label>
         Email address
         <input name="email" type="email" autoComplete="username" required maxLength={254} />
@@ -37,7 +35,7 @@ export function AdminLogin() {
       ) : null}
       <button disabled={pending} className="button button-dark">
         {pending ? 'Signing in…' : 'Sign in to admin'}
-        <ArrowRight size={17} />
+        <ArrowRight size={18} strokeWidth={1.5} aria-hidden="true" />
       </button>
     </form>
   );
