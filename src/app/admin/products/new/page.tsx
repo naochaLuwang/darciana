@@ -12,10 +12,7 @@ export default async function NewProduct() {
     .limit(1000);
   return (
     <>
-      <AdminHeading
-        title="Add a lovely new find"
-        description="Create the product, its options, stock, and category links in one save."
-      />
+      <AdminHeading title="Add product" description="Add details, pricing and stock." />
       {result.error ? (
         <AdminNotice>Categories could not load. Try again before creating a product.</AdminNotice>
       ) : (

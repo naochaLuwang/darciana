@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import './skeletons.css';
+@import '../components/ui/theme.css';
 
 @theme inline {
   --color-background: #faf9f7;
@@ -76,7 +77,7 @@ select,
 textarea {
   outline-offset: 4px;
 }
-:focus-visible {
+:focus-visible:not([data-slot]) {
   outline: 2px solid var(--accent);
 }
 h1,

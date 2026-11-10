@@ -1,0 +1,29 @@
+/* Keep shadcn tokens separate from the storefront's existing colour variables. */
+@theme inline {
+  --color-card: var(--ui-card);
+  --color-card-foreground: var(--ui-foreground);
+  --color-primary: var(--ui-primary);
+  --color-primary-foreground: var(--ui-primary-foreground);
+  --color-secondary: var(--ui-secondary);
+  --color-secondary-foreground: var(--ui-foreground);
+  --color-accent: var(--ui-accent);
+  --color-accent-foreground: var(--ui-foreground);
+  --color-muted: var(--ui-secondary);
+  --color-muted-foreground: var(--ui-muted-foreground);
+  --color-destructive: var(--ui-destructive);
+  --color-border: var(--ui-border);
+  --color-input: var(--ui-input);
+  --color-ring: var(--ui-primary);
+}
+.admin-root {
+  --ui-card: var(--admin-surface);
+  --ui-foreground: var(--admin-ink);
+  --ui-primary: var(--admin-accent);
+  --ui-primary-foreground: #fff;
+  --ui-secondary: var(--admin-raised);
+  --ui-accent: var(--admin-accent-soft);
+  --ui-muted-foreground: var(--admin-muted);
+  --ui-destructive: var(--admin-negative);
+  --ui-border: var(--admin-line);
+  --ui-input: var(--admin-line-strong);
+}

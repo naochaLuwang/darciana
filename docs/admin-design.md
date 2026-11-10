@@ -51,3 +51,11 @@ Verification evidence and desktop/phone previews are saved under `artifacts/admi
 - The eight checked text/status combinations meet 4.5:1 contrast; the lowest checked ratio is 4.79:1.
 - Desktop and phone previews were reviewed. Phone checks confirm that navigation and product forms do not cause page overflow.
 - Previews use isolated test data. No live catalog, accounts, orders or Storage files were changed.
+
+## Product forms with shadcn/ui
+
+The product editor now uses the official shadcn/ui New York components: Card, Field, Input, Textarea, Native Select, Checkbox, Radio Group and Button. Component sources live in `src/components/ui`; `components.json` records the configuration. Theme tokens are scoped to the admin and use the approved Daciana palette without replacing the storefront's colour variables.
+
+New products and options receive a stable UUID-based SKU automatically. The creation form has no SKU input. Editing a saved product retains its existing SKU and keeps the SKU control available. Numeric fields retain their text while being edited; serialization rounds currency amounts to whole rupees while preserving fractional percentage rates.
+
+Browser coverage verifies creating a simple product and two-option product without entering SKUs, preserving generated SKUs after editing, saving the selected default/category, clearing numeric inputs, image uploads and the phone layout. The tests use isolated fixtures.

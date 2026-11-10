@@ -279,12 +279,20 @@ test('owner can manage products, categories, stock and request status', async ({
   await page.getByLabel('Brand', { exact: true }).fill('Darciana');
   await expect(page.getByLabel('Base price (₹)', { exact: true })).toHaveValue('');
   await page.getByLabel('Base price (₹)', { exact: true }).fill('249');
-  await page.getByLabel('Option 1 SKU').fill('PEACH-01');
+  await expect(page.getByLabel(/SKU/)).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/admin-product-new-shadcn.png', fullPage: true });
   await page.getByLabel('Option 1 stock').fill('8');
   await page.getByRole('combobox', { name: 'Status', exact: true }).selectOption('active');
   await page.getByRole('button', { name: 'Save product', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Edit product', exact: true })).toBeVisible();
   await expect(page.getByLabel('Product name', { exact: true })).toHaveValue('Peach lip balm');
+  const sku = page.getByLabel('Option 1 SKU');
+  await expect(sku).toHaveValue(/^DA-[0-9A-F-]{36}$/);
+  const generatedSku = await sku.inputValue();
+  await page.getByLabel('Brand', { exact: true }).fill('Daciana');
+  await page.getByRole('button', { name: 'Save product', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Product saved.' })).toBeVisible();
+  await expect(sku).toHaveValue(generatedSku);
   await page.screenshot({ path: 'test-results/admin-product.png', fullPage: true });
   await page
     .getByRole('navigation', { name: 'Admin navigation' })
@@ -339,6 +347,11 @@ test('admin navigation and editor work on a phone', async ({ page, context }) =>
   await page.getByLabel('This product has multiple options').check();
   await page.getByRole('button', { name: 'Add option', exact: true }).click();
   await expect(page.getByLabel('Option 2 name')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: 'test-results/admin-product-new-phone-shadcn.png',
+    fullPage: true,
+  });
 });
 
 test('product deletion requires confirmation, reports concurrent changes and removes the product permanently', async ({
@@ -814,4 +827,39 @@ test('More reuses legal content and admin changes reach customers without exposi
   await page.screenshot({ path: 'test-results/more-mobile.png', fullPage: true });
   await page.getByRole('link', { name: 'Privacy policy', exact: true }).click();
   await expect(page.locator('.info-content')).toContainText('Privacy fixture content.');
+});
+
+test('new options get distinct automatic SKUs and preserve the chosen default', async ({
+  page,
+  context,
+}) => {
+  await signIn(context, OWNER);
+  await page.goto('/admin/products/new');
+  await page.getByLabel('Product name', { exact: true }).fill('Notebook colours');
+  await page.getByLabel('This product has multiple options').check();
+  await page.getByLabel('Option 1 name').fill('Cream');
+  await page.getByLabel('Option 1 price').fill('149.5');
+  await page.getByLabel('Option 1 price').blur();
+  await expect(page.getByLabel('Option 1 price')).toHaveValue('150');
+  await page.getByLabel('Option 1 stock').fill('0');
+  await page.getByLabel('Option 1 stock').press('Backspace');
+  await expect(page.getByLabel('Option 1 stock')).toHaveValue('');
+  await page.getByLabel('Option 1 stock').fill('6');
+  await page.getByRole('button', { name: 'Add option', exact: true }).click();
+  await page.getByLabel('Option 2 name').fill('Rose');
+  await page.getByLabel('Option 2 price').fill('175');
+  await page.getByLabel('Option 2 stock').fill('3');
+  await page.getByRole('radio', { name: 'Option 2 default', exact: true }).check();
+  await page.getByRole('checkbox', { name: 'Cosmetics', exact: true }).check();
+  await expect(page.getByLabel(/SKU/)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Save product', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Edit product', exact: true })).toBeVisible();
+  const first = await page.getByLabel('Option 1 SKU').inputValue();
+  const second = await page.getByLabel('Option 2 SKU').inputValue();
+  expect(first).toMatch(/^DA-[0-9A-F-]{36}$/);
+  expect(second).toMatch(/^DA-[0-9A-F-]{36}$/);
+  expect(first).not.toBe(second);
+  await expect(page.getByLabel('Option 2 name')).toHaveValue('Rose');
+  await expect(page.getByRole('radio', { name: 'Option 2 default', exact: true })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Cosmetics', exact: true })).toBeChecked();
 });
