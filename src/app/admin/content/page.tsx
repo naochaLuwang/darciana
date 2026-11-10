@@ -1,3 +1,13 @@
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader } from '@/components/ui/card';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
 import Link from 'next/link';
 import { adminSession } from '@/lib/admin';
 import { buildContentPages, type SettingRow } from '@/lib/store-content';
@@ -29,9 +39,9 @@ export default async function ContentAdminPage({
         title="More content"
         description="Manage Support & info and Legal pages."
         action={
-          <Link href="/admin/content?new=1" className="button button-dark">
-            Add page
-          </Link>
+          <Button asChild>
+            <Link href="/admin/content?new=1">Add page</Link>
+          </Button>
         }
       />
       {params.saved === '1' ? (
@@ -46,43 +56,45 @@ export default async function ContentAdminPage({
         <AdminNotice>Content could not load. Refresh and try again.</AdminNotice>
       ) : (
         <div className="admin-category-layout">
-          <section className="admin-panel">
-            <div className="admin-panel-heading">
+          <Card className="gap-0 overflow-hidden py-0">
+            <CardHeader className="admin-panel-heading">
               <h2>Pages</h2>
-            </div>
-            <div className="admin-table-scroll">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Page</th>
-                    <th>Section</th>
-                    <th>Status</th>
-                    <th>
+            </CardHeader>
+            <div className="min-w-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Page</TableHead>
+                    <TableHead>Section</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>
                       <span className="sr-only">Edit</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {pages.map((page) => (
-                    <tr key={page.key}>
-                      <td>
+                    <TableRow key={page.key}>
+                      <TableCell>
                         <strong>{page.title}</strong>
-                      </td>
-                      <td>{page.section === 'support' ? 'Support & info' : 'Legal'}</td>
-                      <td>
+                      </TableCell>
+                      <TableCell>
+                        {page.section === 'support' ? 'Support & info' : 'Legal'}
+                      </TableCell>
+                      <TableCell>
                         {!page.content.trim() ? 'Not added' : page.visible ? 'Visible' : 'Hidden'}
-                      </td>
-                      <td>
+                      </TableCell>
+                      <TableCell>
                         <Link href={`/admin/content?edit=${page.key}`} className="text-link">
                           Edit →
                         </Link>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
-          </section>
+          </Card>
           <ContentEditor key={initial?.key ?? 'new'} initial={initial} configured={configured} />
         </div>
       )}

@@ -1,3 +1,14 @@
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
+import { StatusBadge } from '@/components/admin/common';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader } from '@/components/ui/card';
 import Link from 'next/link';
 import { ArrowRight, Plus, ClipboardList } from 'lucide-react';
 import { adminSession, type AdminOrder } from '@/lib/admin';
@@ -60,108 +71,163 @@ export default async function AdminOverview() {
     <>
       <AdminHeading
         title="Store overview"
-        description="Orders, stock and recent store activity"
+        description="Orders and inventory at a glance"
         action={
-          <Link href="/admin/products/new" className="button button-dark">
-            <Plus size={18} strokeWidth={1.5} aria-hidden="true" /> Add product
-          </Link>
+          <Button asChild>
+            <Link href="/admin/products/new">
+              <Plus size={16} />
+              Add product
+            </Link>
+          </Button>
         }
       />
       {summary.error ? (
-        <AdminNotice>
-          Overview data could not load. Check the database setup and refresh.
-        </AdminNotice>
+        <AdminNotice>Overview data could not load. Refresh and try again.</AdminNotice>
       ) : (
-        <div className="admin-stat-grid">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {cards.map(({ label, value, note, attention, href }) => (
-            <Link
-              href={href}
-              className={`admin-stat${attention ? ' admin-stat-attention' : ''}`}
+            <Card
               key={label}
+              className={
+                attention ? 'gap-0 border-primary/30 py-0 shadow-xs' : 'gap-0 py-0 shadow-xs'
+              }
             >
-              <span>{label}</span>
-              <strong>{value}</strong>
-              <small>{note}</small>
-            </Link>
+              <Link href={href} className="group block space-y-4 p-5">
+                <span className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+                  {label}
+                  <ArrowRight className="size-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+                </span>
+                <strong
+                  className={
+                    attention
+                      ? 'block text-3xl font-semibold tracking-tight text-primary'
+                      : 'block text-3xl font-semibold tracking-tight'
+                  }
+                >
+                  {value}
+                </strong>
+                <span className="block text-xs text-muted-foreground">{note}</span>
+              </Link>
+            </Card>
           ))}
         </div>
       )}
-      <div className="admin-overview-grid">
-        <section className="admin-panel">
-          <div className="admin-panel-heading">
-            <h2>Recent order requests</h2>
-            <Link href="/admin/orders" className="text-link">
-              View all <ArrowRight size={18} strokeWidth={1.5} aria-hidden="true" />
-            </Link>
-          </div>
-          {recent.error ? (
-            <AdminNotice>
-              Order requests could not load. Run the order-request setup if it is still pending.
-            </AdminNotice>
-          ) : recent.data?.length ? (
-            <div className="admin-recent-orders">
-              {(recent.data as AdminOrder[]).map((order) => (
-                <Link key={order.id} href={`/admin/orders/${order.id}`}>
-                  <span className="admin-order-initial" aria-hidden="true">
-                    {order.shipping.name.slice(0, 1).toUpperCase()}
-                  </span>
-                  <div className="admin-order-summary">
-                    <strong>{order.shipping.name}</strong>
-                    <div className="admin-order-meta">
-                      <span className="admin-order-reference">
-                        #{order.id.slice(0, 8).toUpperCase()}
-                      </span>
-                      <time dateTime={order.created_at}>{adminDate(order.created_at)}</time>
-                    </div>
-                  </div>
-                  <div>
-                    <strong>{money(order.order_total ?? order.item_total)}</strong>
-                    <span className={`admin-status ${order.status}`}>
-                      {order.status.replaceAll('_', ' ')}
-                    </span>
-                  </div>
-                </Link>
-              ))}
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <Card className="min-w-0 gap-0 overflow-hidden py-0">
+          <CardHeader className="admin-panel-heading">
+            <div>
+              <h2 className="font-semibold">Recent order requests</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                The latest orders placed in your store
+              </p>
             </div>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/admin/orders">
+                View all
+                <ArrowRight />
+              </Link>
+            </Button>
+          </CardHeader>
+          {recent.error ? (
+            <div className="p-5">
+              <AdminNotice>Order requests could not load.</AdminNotice>
+            </div>
+          ) : recent.data?.length ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead>
+                    <span className="sr-only">Review</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(recent.data as AdminOrder[]).map((order) => (
+                  <TableRow key={order.id}>
+                    <TableCell>
+                      <Link href={`/admin/orders/${order.id}`} className="flex items-center gap-3">
+                        <span
+                          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-sm font-medium"
+                          aria-hidden="true"
+                        >
+                          {order.shipping.name.slice(0, 1).toUpperCase()}
+                        </span>
+                        <div>
+                          <strong className="block font-medium">{order.shipping.name}</strong>
+                          <span className="block text-xs text-muted-foreground">
+                            #{order.id.slice(0, 8).toUpperCase()} · {adminDate(order.created_at)}
+                          </span>
+                        </div>
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={order.status} />
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {money(order.order_total ?? order.item_total)}
+                    </TableCell>
+                    <TableCell>
+                      <Button asChild variant="ghost" size="icon-sm">
+                        <Link
+                          href={`/admin/orders/${order.id}`}
+                          aria-label={`Review request ${order.id.slice(0, 8)}`}
+                        >
+                          <ArrowRight />
+                        </Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           ) : (
             <div className="admin-empty">
-              <ClipboardList size={24} strokeWidth={1.5} aria-hidden="true" />
+              <ClipboardList className="size-7 text-muted-foreground" />
               <h3>No requests yet</h3>
               <p>New customer orders will appear here</p>
             </div>
           )}
-        </section>
-        <section className="admin-panel">
-          <div className="admin-panel-heading">
-            <h2>Recent activity</h2>
-          </div>
+        </Card>
+        <Card className="gap-0 overflow-hidden py-0">
+          <CardHeader className="admin-panel-heading">
+            <h2 className="font-semibold">Store activity</h2>
+          </CardHeader>
           {activity.error ? (
-            <AdminNotice>Activity could not load.</AdminNotice>
+            <div className="p-5">
+              <AdminNotice>Activity could not load.</AdminNotice>
+            </div>
           ) : activity.data?.length ? (
-            <ul className="admin-activity">
+            <ul className="divide-y divide-border">
               {activity.data.map((entry) => (
-                <li key={entry.id}>
-                  <span />
-                  <div>
-                    <strong>{entry.action.replaceAll('_', ' ')}</strong>
-                    <p>{entry.label}</p>
-                    <small>{adminDate(entry.created_at)}</small>
-                  </div>
+                <li key={entry.id} className="space-y-1 px-5 py-4">
+                  <p className="text-sm font-medium capitalize">
+                    {entry.action.replaceAll('_', ' ')}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{entry.label}</p>
+                  <time
+                    className="block pt-1 text-xs text-muted-foreground"
+                    dateTime={entry.created_at}
+                  >
+                    {adminDate(entry.created_at)}
+                  </time>
                 </li>
               ))}
             </ul>
           ) : (
             <div className="admin-empty">
               <h3>No recent activity</h3>
-              <p>Catalog and order updates will appear here</p>
+              <p>Catalog and order changes appear here</p>
             </div>
           )}
-        </section>
+        </Card>
       </div>
-      <div className="admin-information">
-        Item value excludes delivery and is not collected revenue. Delivery prices are set by area;
-        payment and stock reservation are handled separately.
-      </div>
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Requested item value covers the last 30 days and excludes delivery and cancelled orders. It
+        is not collected revenue.
+      </p>
     </>
   );
 }

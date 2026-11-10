@@ -56,6 +56,26 @@ Verification evidence and desktop/phone previews are saved under `artifacts/admi
 
 The product editor now uses the official shadcn/ui New York components: Card, Field, Input, Textarea, Native Select, Checkbox, Radio Group and Button. Component sources live in `src/components/ui`; `components.json` records the configuration. Theme tokens are scoped to the admin and use the approved Daciana palette without replacing the storefront's colour variables.
 
-New products and options receive a stable UUID-based SKU automatically. The creation form has no SKU input. Editing a saved product retains its existing SKU and keeps the SKU control available. Numeric fields retain their text while being edited; serialization rounds currency amounts to whole rupees while preserving fractional percentage rates.
+New products and options receive a stable UUID-based SKU automatically. The creation form has no SKU input. Saved products retain their existing SKUs; neither creation nor editing exposes SKU inputs. Numeric fields retain their text while being edited; serialization rounds currency amounts to whole rupees while preserving fractional percentage rates.
 
 Browser coverage verifies creating a simple product and two-option product without entering SKUs, preserving generated SKUs after editing, saving the selected default/category, clearing numeric inputs, image uploads and the phone layout. The tests use isolated fixtures.
+
+## Full shadcn admin redesign
+
+The owner requested a complete admin redesign after the initial product-form update. Scope includes the shell, sign-in/access screens, overview, product list and editor, inventory, categories, shipping, orders and review, content editor, notification composer/history and loading states. The storefront keeps its existing design.
+
+The follow-up audit found mixed component systems: most pages still used bespoke panels/tables, mobile navigation occupied the top of every screen, editing exposed SKU inputs, and native browser selects made the product form look similar to the old version. The old admin stylesheet also coupled visual styling to HTML tags, which competed with shadcn's component styles.
+
+The approved Daciana direction remains: a practical store workspace, white and neutral surfaces, readable charcoal text, restrained rose actions, real logo, and emphasis on orders and inventory. This pass uses the official shadcn/ui New York component sources, with project-specific modifications tracked in the repository.
+
+1. **Spacing:** Consistent page gutters and 24px section gaps, compact table rows, desktop controls with larger phone touch targets.
+2. **Colour:** Scoped shadcn tokens for cards, popovers, inputs, borders, sidebar and semantic status badges. Portal content carries the same theme; storefront variables remain separate.
+3. **Icons:** Lucide navigation and action icons, with the Daciana monogram in the collapsed sidebar.
+4. **Copy:** Short product, inventory, order and delivery descriptions. Existing action names remain recognizable.
+5. **Type:** A readable 14px interface, clear page titles, restrained section headings and tabular amounts.
+6. **Layout:** Actual shadcn Sidebar with collapsed navigation, mobile Sheet, breadcrumbs and account dropdown; responsive Card/Table layouts throughout.
+7. **Details:** Actual shadcn Select, Field, Checkbox, Switch, Input, Textarea, Button, Badge, Alert, Dialog and Tabs components. Both product forms hide SKUs while preserving their saved values. Typed confirmation still protects product deletion.
+8. **Visuals:** Existing Storage-backed store logo, product and category images; keyboard-accessible upload buttons preserve the current upload checks. No catalog imagery was invented or replaced.
+9. **Motion and loading:** Component state changes explain navigation and menus. Page loading shapes use shadcn Skeleton and match the new cards/forms/tables.
+
+Verification uses fixture-backed browser tests for add/edit/save, automatic and existing SKU preservation, whole rupees, uploads, stock, category hierarchy, status changes, private admin access, mobile navigation, deletion confirmation, sidebar collapse, sign-out and history tabs. No production order, notification or catalog record is created during these tests.

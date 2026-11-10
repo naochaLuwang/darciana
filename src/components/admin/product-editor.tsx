@@ -1,14 +1,6 @@
 'use client';
 import Link from 'next/link';
-import {
-  cloneElement,
-  useId,
-  useState,
-  useTransition,
-  useSyncExternalStore,
-  type ReactElement,
-  type ReactNode,
-} from 'react';
+import { useId, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Save, ExternalLink } from 'lucide-react';
 import { saveProduct, saveProductStatus } from '@/app/admin/actions';
@@ -25,32 +17,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { AdminField as ProductField, AdminSelect, FormReady } from './form-controls';
 import { Field, FieldGroup, FieldLabel, FieldDescription, FieldError } from '@/components/ui/field';
 
-// SSR controls stay disabled until their client event handlers are available.
-const subscribeToHydration = () => () => {};
-const clientReady = () => true;
-const serverReady = () => false;
-
-function ProductField({
-  label,
-  description,
-  children,
-}: {
-  label: string;
-  description?: ReactNode;
-  children: ReactElement<{ id?: string; 'aria-describedby'?: string }>;
-}) {
-  const id = useId();
-  return (
-    <Field>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      {cloneElement(children, { id, 'aria-describedby': description ? `${id}-hint` : undefined })}
-      {description ? <FieldDescription id={`${id}-hint`}>{description}</FieldDescription> : null}
-    </Field>
-  );
-}
+const discountOptions = [
+  { value: 'none', label: 'No discount' },
+  { value: 'amount', label: 'Amount off (₹)' },
+  { value: 'percentage', label: 'Percentage off (%)' },
+];
 
 export function ProductEditor({
   initial,
@@ -60,7 +34,6 @@ export function ProductEditor({
   categories: Category[];
 }) {
   const router = useRouter();
-  const ready = useSyncExternalStore(subscribeToHydration, clientReady, serverReady);
   const fieldId = useId();
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState(initial?.name ?? '');
@@ -174,9 +147,9 @@ export function ProductEditor({
         submit();
       }}
     >
-      <fieldset disabled={!ready} className="admin-editor min-w-0 w-full">
+      <FormReady className="admin-editor min-w-0 w-full">
         <div className="admin-editor-main">
-          <Card className="shadow-none">
+          <Card className="shadow-xs">
             <CardHeader>
               <CardTitle>
                 <h2>Product details</h2>
@@ -236,7 +209,7 @@ export function ProductEditor({
               </FieldGroup>
             </CardContent>
           </Card>
-          <Card className="shadow-none">
+          <Card className="shadow-xs">
             <CardHeader>
               <CardTitle>
                 <h2>Price & options</h2>
@@ -276,19 +249,14 @@ export function ProductEditor({
                       />
                     </ProductField>
                     <ProductField label="Discount">
-                      <NativeSelect
+                      <AdminSelect
                         value={discountType}
-                        onChange={(event) => {
-                          setDiscountType(event.target.value);
+                        onValueChange={(value) => {
+                          setDiscountType(value);
                           setDiscountValue('');
                         }}
-                      >
-                        <NativeSelectOption value="none">No discount</NativeSelectOption>
-                        <NativeSelectOption value="amount">Amount off (₹)</NativeSelectOption>
-                        <NativeSelectOption value="percentage">
-                          Percentage off (%)
-                        </NativeSelectOption>
-                      </NativeSelect>
+                        options={discountOptions}
+                      />
                     </ProductField>
                     {discountType !== 'none' ? (
                       <ProductField label="Discount value">
@@ -324,7 +292,7 @@ export function ProductEditor({
                 >
                   {variants.map((variant, index) => (
                     <div
-                      className="space-y-5 rounded-lg border border-border bg-accent/30 p-4 sm:p-5"
+                      className="space-y-5 rounded-lg border border-border bg-muted/30 p-4 sm:p-5"
                       key={variant.key}
                     >
                       <div className="flex flex-wrap items-center gap-3">
@@ -373,17 +341,6 @@ export function ProductEditor({
                             />
                           </ProductField>
                         ) : null}
-                        {initial ? (
-                          <ProductField label="SKU">
-                            <Input
-                              aria-label={`Option ${index + 1} SKU`}
-                              value={variant.sku}
-                              required
-                              maxLength={1000}
-                              onChange={(event) => patchVariant(index, { sku: event.target.value })}
-                            />
-                          </ProductField>
-                        ) : null}
                         <ProductField label="Stock">
                           <Input
                             aria-label={`Option ${index + 1} stock`}
@@ -423,24 +380,16 @@ export function ProductEditor({
                               />
                             </ProductField>
                             <ProductField label="Discount">
-                              <NativeSelect
+                              <AdminSelect
                                 value={variant.discount_type}
-                                onChange={(event) =>
+                                onValueChange={(value) =>
                                   patchVariant(index, {
-                                    discount_type: event.target
-                                      .value as DraftVariant['discount_type'],
+                                    discount_type: value as DraftVariant['discount_type'],
                                     discount_value: '',
                                   })
                                 }
-                              >
-                                <NativeSelectOption value="none">No discount</NativeSelectOption>
-                                <NativeSelectOption value="amount">
-                                  Amount off (₹)
-                                </NativeSelectOption>
-                                <NativeSelectOption value="percentage">
-                                  Percentage off (%)
-                                </NativeSelectOption>
-                              </NativeSelect>
+                                options={discountOptions}
+                              />
                             </ProductField>
                             {variant.discount_type !== 'none' ? (
                               <ProductField label="Discount value">
@@ -520,7 +469,7 @@ export function ProductEditor({
           </Card>
         </div>
         <aside className="admin-editor-aside">
-          <Card className="shadow-none">
+          <Card className="shadow-xs">
             <CardHeader>
               <CardTitle>
                 <h2>Visibility</h2>
@@ -529,21 +478,20 @@ export function ProductEditor({
             <CardContent>
               <FieldGroup>
                 <ProductField label="Status">
-                  <NativeSelect
+                  <AdminSelect
                     value={status}
-                    onChange={(event) => setStatus(event.target.value as 'active' | 'inactive')}
-                  >
-                    <NativeSelectOption value="inactive">
-                      Inactive — hidden from shop
-                    </NativeSelectOption>
-                    <NativeSelectOption value="active">Active — visible in shop</NativeSelectOption>
-                  </NativeSelect>
+                    onValueChange={(value) => setStatus(value as 'active' | 'inactive')}
+                    options={[
+                      { value: 'inactive', label: 'Inactive — hidden from shop' },
+                      { value: 'active', label: 'Active — visible in shop' },
+                    ]}
+                  />
                 </ProductField>
                 <FieldDescription>Inactive products are hidden from customers.</FieldDescription>
               </FieldGroup>
             </CardContent>
           </Card>
-          <Card className="shadow-none">
+          <Card className="shadow-xs">
             <CardHeader>
               <CardTitle>
                 <h2>Categories</h2>
@@ -632,7 +580,7 @@ export function ProductEditor({
             ) : null}
           </div>
         </aside>
-      </fieldset>
+      </FormReady>
     </form>
   );
 }

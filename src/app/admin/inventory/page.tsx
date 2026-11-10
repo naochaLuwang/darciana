@@ -1,3 +1,15 @@
+import { AdminCheck } from '@/components/admin/form-controls';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
 import Link from 'next/link';
 import { adminSession } from '@/lib/admin';
 import { AdminHeading, AdminNotice, Pagination, pageNumber } from '@/components/admin/common';
@@ -35,43 +47,39 @@ export default async function Inventory({
   const rows = (result.data ?? []) as unknown as Row[];
   return (
     <>
-      <AdminHeading
-        title="Inventory"
-        description="Update option-level stock for active products. Zero stock makes an option unavailable."
-      />
+      <AdminHeading title="Inventory" description="Stock levels for active products" />
       <form className="admin-filterbar">
-        <input name="q" aria-label="Search SKU" defaultValue={q} placeholder="Search by SKU" />
-        <label className="admin-checkbox">
-          <input name="low" type="checkbox" value="true" defaultChecked={low} />
-          Low stock only (≤5)
-        </label>
-        <button className="button button-outline">Apply filters</button>
+        <Input name="q" aria-label="Search SKU" defaultValue={q} placeholder="Search by SKU" />
+        <div className="min-w-fit">
+          <AdminCheck name="low" value="true" defaultChecked={low} label="Low stock only (≤5)" />
+        </div>
+        <Button variant="outline">Apply filters</Button>
       </form>
       {result.error ? (
         <AdminNotice>Inventory could not load. Check your admin setup and refresh.</AdminNotice>
       ) : (
-        <section className="admin-panel admin-table-panel">
-          <div className="admin-table-scroll">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Product & option</th>
-                  <th>SKU</th>
-                  <th>Availability</th>
-                  <th>Update stock</th>
-                </tr>
-              </thead>
-              <tbody>
+        <Card className="admin-table-panel gap-0 overflow-hidden py-0">
+          <div className="min-w-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product & option</TableHead>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Availability</TableHead>
+                  <TableHead>Update stock</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {rows.map((row) => (
-                  <tr key={row.id}>
-                    <td>
+                  <TableRow key={row.id}>
+                    <TableCell>
                       <Link href={`/admin/products/${row.products.id}`}>
                         <strong>{row.products.name}</strong>
                         <small>{row.title}</small>
                       </Link>
-                    </td>
-                    <td className="admin-sku">{row.sku}</td>
-                    <td>
+                    </TableCell>
+                    <TableCell className="admin-sku">{row.sku}</TableCell>
+                    <TableCell>
                       <span
                         className={`admin-status ${row.stock === 0 ? 'inactive' : row.stock <= 5 ? 'low' : 'active'}`}
                       >
@@ -81,14 +89,14 @@ export default async function Inventory({
                             ? 'Low stock'
                             : 'In stock'}
                       </span>
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell>
                       <StockEditor id={row.id} stock={row.stock} updatedAt={row.updated_at} />
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
           {!rows.length ? (
             <div className="admin-empty">
@@ -101,7 +109,7 @@ export default async function Inventory({
             count={result.count ?? 0}
             href={`/admin/inventory?${new URLSearchParams({ q, low: String(low) })}`}
           />
-        </section>
+        </Card>
       )}
     </>
   );

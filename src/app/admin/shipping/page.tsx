@@ -1,3 +1,13 @@
+import { StatusBadge } from '@/components/admin/common';
+import { Card, CardHeader } from '@/components/ui/card';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
 import Link from 'next/link';
 import { adminSession } from '@/lib/admin';
 import type { ShippingArea } from '@/lib/shipping';
@@ -24,7 +34,7 @@ export default async function ShippingPage({
     <>
       <AdminHeading
         title="Shipping areas"
-        description="Set an area name and delivery price. Customers search and select their area at checkout."
+        description="Delivery areas and charges shown at checkout"
       />
       {params.saved === '1' ? (
         <p role="status" className="form-success">
@@ -38,46 +48,46 @@ export default async function ShippingPage({
         </AdminNotice>
       ) : (
         <div className="admin-category-layout">
-          <section className="admin-panel">
-            <div className="admin-panel-heading">
+          <Card className="gap-0 overflow-hidden py-0">
+            <CardHeader className="admin-panel-heading">
               <h2>Your delivery areas</h2>
               <span>
                 {areas.filter((area) => area.is_active).length} active · {areas.length} total
               </span>
-            </div>
-            <div className="admin-table-scroll">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Area</th>
-                    <th>Delivery price</th>
-                    <th>Status</th>
-                    <th>
+            </CardHeader>
+            <div className="min-w-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Area</TableHead>
+                    <TableHead>Delivery price</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>
                       <span className="sr-only">Edit</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {areas.map((area) => (
-                    <tr key={area.id}>
-                      <td>
+                    <TableRow key={area.id}>
+                      <TableCell>
                         <strong>{area.name}</strong>
-                      </td>
-                      <td>{area.price === 0 ? 'Free' : money(area.price)}</td>
-                      <td>
-                        <span className={`admin-status ${area.is_active ? 'active' : 'inactive'}`}>
+                      </TableCell>
+                      <TableCell>{area.price === 0 ? 'Free' : money(area.price)}</TableCell>
+                      <TableCell>
+                        <StatusBadge status={area.is_active ? 'active' : 'inactive'}>
                           {area.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td>
+                        </StatusBadge>
+                      </TableCell>
+                      <TableCell>
                         <Link className="text-link" href={`/admin/shipping?edit=${area.id}`}>
                           Edit →
                         </Link>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
             {!areas.length ? (
               <div className="admin-empty">
@@ -87,7 +97,7 @@ export default async function ShippingPage({
                 </p>
               </div>
             ) : null}
-          </section>
+          </Card>
           <ShippingEditor key={initial?.id ?? 'new'} initial={initial} />
         </div>
       )}

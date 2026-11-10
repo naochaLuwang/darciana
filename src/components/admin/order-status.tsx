@@ -1,4 +1,7 @@
 'use client';
+import { Button } from '@/components/ui/button';
+import { AdminField, AdminCheck, AdminSelect, FormReady } from './form-controls';
+
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { orderTransitions } from '@/lib/admin-validation';
@@ -42,42 +45,48 @@ export function OrderStatus({ id, status }: { id: string; status: string }) {
         });
       }}
     >
-      <label>
-        Move request to
-        <select value={next} onChange={(event) => setNext(event.target.value)}>
-          {options.map((option) => (
-            <option key={option} value={option}>
-              {option.charAt(0).toUpperCase() + option.slice(1)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="admin-checkbox">
-        <input type="checkbox" required key={next} />
-        <span>I’ve reviewed this request and want to mark it {next}.</span>
-      </label>
-      <label className="admin-checkbox">
-        <input
-          type="checkbox"
-          checked={notifyCustomer}
-          onChange={(event) => setNotifyCustomer(event.target.checked)}
-          disabled={pending}
+      <FormReady>
+        <AdminField label="Move request to">
+          <AdminSelect
+            value={next}
+            onValueChange={setNext}
+            options={options.map((option) => ({
+              value: option,
+              label: option.charAt(0).toUpperCase() + option.slice(1),
+            }))}
+          />
+        </AdminField>
+        <AdminCheck
+          required
+          key={next}
+          label={
+            <>
+              <span>I’ve reviewed this request and want to mark it {next}.</span>
+            </>
+          }
         />
-        <span>Send the customer a push notification.</span>
-      </label>
-      {error ? (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
-      ) : null}
-      {message ? (
-        <p role="status" className="admin-saved">
-          {message}
-        </p>
-      ) : null}
-      <button className="button button-dark" disabled={pending}>
-        {pending ? 'Updating…' : 'Update status'}
-      </button>
+        <AdminCheck
+          checked={notifyCustomer}
+          onCheckedChange={(checked) => setNotifyCustomer(checked === true)}
+          disabled={pending}
+          label={
+            <>
+              <span>Send the customer a push notification.</span>
+            </>
+          }
+        />
+        {error ? (
+          <p role="alert" className="form-error">
+            {error}
+          </p>
+        ) : null}
+        {message ? (
+          <p role="status" className="admin-saved">
+            {message}
+          </p>
+        ) : null}
+        <Button disabled={pending}>{pending ? 'Updating…' : 'Update status'}</Button>
+      </FormReady>
     </form>
   );
 }

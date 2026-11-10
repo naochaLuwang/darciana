@@ -1,4 +1,4 @@
-import { test, expect, type BrowserContext } from '@playwright/test';
+import { test, expect, type BrowserContext, type APIRequestContext } from '@playwright/test';
 import { createServerClient } from '@supabase/ssr';
 import { OWNER, CUSTOMER, tokenFor } from '../fixtures/admin-api.mjs';
 import { checkProductGalleries } from '../fixtures/product-gallery';
@@ -21,12 +21,30 @@ async function signIn(context: BrowserContext, id: string) {
     cookies.map(({ name, value }) => ({ name, value, domain: '127.0.0.1', path: '/' })),
   );
 }
+async function savedProduct(request: APIRequestContext, name: string) {
+  const response = await request.get('http://127.0.0.1:54329/rest/v1/products', {
+    headers: { Authorization: `Bearer ${tokenFor(OWNER)}` },
+  });
+  expect(response.ok()).toBe(true);
+  const products = (await response.json()) as {
+    name: string;
+    product_variants: { sku: string; is_default: boolean }[];
+  }[];
+  const product = products.find((product) => product.name === name);
+  expect(product).toBeTruthy();
+  return product!;
+}
+async function choose(page: import('@playwright/test').Page, label: string, option: string) {
+  await page.getByRole('combobox', { name: label, exact: true }).click();
+  await page.getByRole('option', { name: option, exact: true }).click();
+}
 test.beforeEach(async ({ request }) => {
   await request.get('http://127.0.0.1:54329/__reset');
 });
 test('whole rupees stay consistent across admin inputs, percentage discounts, bag quantities and checkout', async ({
   page,
   context,
+  request,
 }) => {
   await signIn(context, OWNER);
   await page.goto('/admin/products/33333333-3333-4333-8333-333333333333');
@@ -45,10 +63,12 @@ test('whole rupees stay consistent across admin inputs, percentage discounts, ba
   await discount.fill('99.5');
   await discount.blur();
   await expect(discount).toHaveValue('100');
-  await page.getByRole('combobox', { name: 'Discount', exact: true }).selectOption('percentage');
+  await choose(page, 'Discount', 'Percentage off (%)');
   await discount.fill('50');
   await page.getByRole('button', { name: 'Save product', exact: true }).click();
+  await expect(page.getByLabel(/SKU/)).toHaveCount(0);
   await expect(page.getByRole('status').filter({ hasText: 'Product saved.' })).toBeVisible();
+  expect((await savedProduct(request, 'Rose lip tint')).product_variants[0].sku).toBe('ROSE-01');
   await page.goto('/admin/shipping');
   const delivery = page.getByLabel('Delivery price (₹)', { exact: true });
   await delivery.fill('50.5');
@@ -262,6 +282,7 @@ test('signed-out and customer accounts cannot see admin data', async ({ page, co
 test('owner can manage products, categories, stock and request status', async ({
   page,
   context,
+  request,
 }) => {
   await signIn(context, OWNER);
   await page.goto('/admin');
@@ -282,26 +303,27 @@ test('owner can manage products, categories, stock and request status', async ({
   await expect(page.getByLabel(/SKU/)).toHaveCount(0);
   await page.screenshot({ path: 'test-results/admin-product-new-shadcn.png', fullPage: true });
   await page.getByLabel('Option 1 stock').fill('8');
-  await page.getByRole('combobox', { name: 'Status', exact: true }).selectOption('active');
+  await choose(page, 'Status', 'Active — visible in shop');
   await page.getByRole('button', { name: 'Save product', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Edit product', exact: true })).toBeVisible();
   await expect(page.getByLabel('Product name', { exact: true })).toHaveValue('Peach lip balm');
-  const sku = page.getByLabel('Option 1 SKU');
-  await expect(sku).toHaveValue(/^DA-[0-9A-F-]{36}$/);
-  const generatedSku = await sku.inputValue();
+  await expect(page.getByLabel(/SKU/)).toHaveCount(0);
+  const generatedSku = (await savedProduct(request, 'Peach lip balm')).product_variants[0].sku;
+  expect(generatedSku).toMatch(/^DA-[0-9A-F-]{36}$/);
   await page.getByLabel('Brand', { exact: true }).fill('Daciana');
   await page.getByRole('button', { name: 'Save product', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Product saved.' })).toBeVisible();
-  await expect(sku).toHaveValue(generatedSku);
+  await expect(page.getByLabel(/SKU/)).toHaveCount(0);
+  expect((await savedProduct(request, 'Peach lip balm')).product_variants[0].sku).toBe(
+    generatedSku,
+  );
   await page.screenshot({ path: 'test-results/admin-product.png', fullPage: true });
   await page
     .getByRole('navigation', { name: 'Admin navigation' })
     .getByRole('link', { name: 'Categories', exact: true })
     .click();
   await page.getByLabel('Category name', { exact: true }).fill('Notebooks');
-  await page
-    .getByRole('combobox', { name: 'Parent category', exact: true })
-    .selectOption({ label: 'Stationery' });
+  await choose(page, 'Parent category', 'Stationery');
   await page.getByRole('button', { name: 'Save category', exact: true }).click();
   await expect(page.getByText('Category saved.', { exact: true })).toBeVisible();
   await expect(
@@ -320,9 +342,7 @@ test('owner can manage products, categories, stock and request status', async ({
     .getByRole('link', { name: 'Order requests', exact: true })
     .click();
   await page.getByRole('link', { name: 'Review →' }).click();
-  await page
-    .getByRole('combobox', { name: 'Move request to', exact: true })
-    .selectOption('confirmed');
+  await choose(page, 'Move request to', 'Confirmed');
   await page.getByLabel('I’ve reviewed this request and want to mark it confirmed.').check();
   await page.getByRole('button', { name: 'Update status' }).click();
   await expect(page.locator('.admin-panel-heading .admin-status')).toHaveText('confirmed');
@@ -332,13 +352,18 @@ test('admin navigation and editor work on a phone', async ({ page, context }) =>
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/admin');
   await expect(page.getByRole('heading', { name: 'Store overview' })).toBeVisible();
-  const logo = page
-    .locator('.admin-sidebar')
-    .getByRole('img', { name: 'Daciana — Stationery & Cosmetics' });
+  await expect(page.getByRole('navigation', { name: 'Admin navigation' })).not.toBeVisible();
+  await page.getByRole('button', { name: 'Toggle navigation', exact: true }).click();
+  const drawer = page.getByRole('dialog');
+  await expect(drawer.getByRole('navigation', { name: 'Admin navigation' })).toBeVisible();
+  const logo = drawer.getByRole('img', { name: 'Daciana — Stationery & Cosmetics' });
+  await expect(logo).toBeVisible();
   await expect
     .poll(() => logo.evaluate((image) => (image as HTMLImageElement).naturalWidth))
     .toBeGreaterThan(0);
-  await expect(page.getByRole('navigation', { name: 'Admin navigation' })).toBeVisible();
+  await drawer.getByRole('link', { name: 'Products', exact: true }).click();
+  await expect(drawer).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Products', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/admin-mobile.png', fullPage: true });
   await page.goto('/admin/products/new');
@@ -832,6 +857,7 @@ test('More reuses legal content and admin changes reach customers without exposi
 test('new options get distinct automatic SKUs and preserve the chosen default', async ({
   page,
   context,
+  request,
 }) => {
   await signIn(context, OWNER);
   await page.goto('/admin/products/new');
@@ -854,12 +880,49 @@ test('new options get distinct automatic SKUs and preserve the chosen default', 
   await expect(page.getByLabel(/SKU/)).toHaveCount(0);
   await page.getByRole('button', { name: 'Save product', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Edit product', exact: true })).toBeVisible();
-  const first = await page.getByLabel('Option 1 SKU').inputValue();
-  const second = await page.getByLabel('Option 2 SKU').inputValue();
+  await expect(page.getByLabel(/SKU/)).toHaveCount(0);
+  const saved = await savedProduct(request, 'Notebook colours');
+  const [first, second] = saved.product_variants.map((variant) => variant.sku);
   expect(first).toMatch(/^DA-[0-9A-F-]{36}$/);
   expect(second).toMatch(/^DA-[0-9A-F-]{36}$/);
   expect(first).not.toBe(second);
   await expect(page.getByLabel('Option 2 name')).toHaveValue('Rose');
   await expect(page.getByRole('radio', { name: 'Option 2 default', exact: true })).toBeChecked();
   await expect(page.getByRole('checkbox', { name: 'Cosmetics', exact: true })).toBeChecked();
+});
+
+test('shadcn sidebar, account menu and history tabs work without losing admin access controls', async ({
+  page,
+  context,
+}) => {
+  await signIn(context, OWNER);
+  await page.goto('/admin');
+  await expect(page.locator('[data-slot="sidebar-wrapper"]')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Add product', exact: true })).toHaveCSS(
+    'color',
+    'rgb(255, 255, 255)',
+  );
+  await page.getByRole('button', { name: 'Toggle navigation', exact: true }).click();
+  await expect(page.locator('[data-state="collapsed"][data-collapsible="icon"]')).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Daciana', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Toggle navigation', exact: true }).click();
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Admin navigation' })
+      .getByRole('link', { name: 'Products', exact: true }),
+  ).toBeVisible();
+  await page.goto('/admin/notifications');
+  await expect(page.getByRole('tab', { name: 'Push notifications', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await page.getByRole('tab', { name: 'Order emails', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Order emails', exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'Push notifications', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Sending history', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Admin account', exact: true }).click();
+  await expect(page.getByRole('menu')).toBeVisible();
+  await page.getByRole('menuitem', { name: 'Sign out of admin', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Admin sign in', exact: true })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Admin navigation' })).toHaveCount(0);
 });

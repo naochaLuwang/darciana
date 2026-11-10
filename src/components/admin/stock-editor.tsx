@@ -1,4 +1,8 @@
 'use client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { FormReady } from './form-controls';
+
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveStock } from '@/app/admin/actions';
@@ -41,30 +45,32 @@ export function StockEditor({
         });
       }}
     >
-      <div>
-        <input
-          aria-label="Stock quantity"
-          type="number"
-          min="0"
-          max="1000000"
-          step="1"
-          required
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-        />
-        <button className="button button-outline" disabled={pending || Number(value) === stock}>
-          {pending ? 'Saving…' : 'Save stock'}
-        </button>
-      </div>
-      {error ? (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
-      ) : message ? (
-        <p role="status" className="admin-saved">
-          {message}
-        </p>
-      ) : null}
+      <FormReady>
+        <div>
+          <Input
+            aria-label="Stock quantity"
+            type="number"
+            min="0"
+            max="1000000"
+            step="1"
+            required
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+          />
+          <Button variant="outline" disabled={pending || Number(value) === stock}>
+            {pending ? 'Saving…' : 'Save stock'}
+          </Button>
+        </div>
+        {error ? (
+          <p role="alert" className="form-error">
+            {error}
+          </p>
+        ) : message ? (
+          <p role="status" className="admin-saved">
+            {message}
+          </p>
+        ) : null}
+      </FormReady>
     </form>
   );
 }

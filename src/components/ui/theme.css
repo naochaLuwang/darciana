@@ -1,7 +1,10 @@
-/* Keep shadcn tokens separate from the storefront's existing colour variables. */
+/* Isolated shadcn tokens: storefront variables and colours keep their existing values. */
+@custom-variant dark (&:is(.dark *));
 @theme inline {
   --color-card: var(--ui-card);
   --color-card-foreground: var(--ui-foreground);
+  --color-popover: var(--ui-card);
+  --color-popover-foreground: var(--ui-foreground);
   --color-primary: var(--ui-primary);
   --color-primary-foreground: var(--ui-primary-foreground);
   --color-secondary: var(--ui-secondary);
@@ -14,16 +17,39 @@
   --color-border: var(--ui-border);
   --color-input: var(--ui-input);
   --color-ring: var(--ui-primary);
+  --color-sidebar: var(--ui-sidebar);
+  --color-sidebar-foreground: var(--ui-foreground);
+  --color-sidebar-primary: var(--ui-primary);
+  --color-sidebar-primary-foreground: var(--ui-primary-foreground);
+  --color-sidebar-accent: var(--ui-accent);
+  --color-sidebar-accent-foreground: var(--ui-foreground);
+  --color-sidebar-border: var(--ui-border);
+  --color-sidebar-ring: var(--ui-primary);
 }
-.admin-root {
-  --ui-card: var(--admin-surface);
-  --ui-foreground: var(--admin-ink);
-  --ui-primary: var(--admin-accent);
+.admin-root,
+.admin-ui {
+  --ui-background: #fff;
+  --ui-card: #fff;
+  --ui-foreground: #24262b;
+  --ui-primary: #8c3456;
   --ui-primary-foreground: #fff;
-  --ui-secondary: var(--admin-raised);
-  --ui-accent: var(--admin-accent-soft);
-  --ui-muted-foreground: var(--admin-muted);
-  --ui-destructive: var(--admin-negative);
-  --ui-border: var(--admin-line);
-  --ui-input: var(--admin-line-strong);
+  --ui-secondary: #f4f5f6;
+  --ui-accent: #f3edf0;
+  --ui-sidebar: #fafafa;
+  --ui-muted-foreground: #656c76;
+  --ui-destructive: #a33442;
+  --ui-border: #e4e6e9;
+  --ui-input: #d7dbe0;
+  color: var(--ui-foreground);
+  font:
+    14px/1.5 Arial,
+    Helvetica,
+    sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+@layer base {
+  .admin-root *,
+  .admin-ui * {
+    border-color: var(--ui-border);
+  }
 }

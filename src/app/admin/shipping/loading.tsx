@@ -1,4 +1,4 @@
-import { AdminScreenSkeleton } from '@/components/screen-skeleton';
+import { AdminScreenSkeleton } from '@/components/admin/loading-skeleton';
 
 export default function Loading() {
   return <AdminScreenSkeleton screen="shipping" />;

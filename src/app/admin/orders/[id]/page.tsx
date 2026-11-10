@@ -1,3 +1,6 @@
+import { StatusBadge } from '@/components/admin/common';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader } from '@/components/ui/card';
 import { paymentLabel } from '@/lib/payment';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -29,20 +32,18 @@ export default async function ReviewOrder({ params }: { params: Promise<{ id: st
         title={`Request #${order.id.slice(0, 8).toUpperCase()}`}
         description={`Received ${adminDate(order.created_at)} IST`}
         action={
-          <Link href="/admin/orders" className="button button-outline">
-            Back to requests
-          </Link>
+          <Button asChild variant="outline">
+            <Link href="/admin/orders">Back to requests</Link>
+          </Button>
         }
       />
       <div className="admin-editor">
         <div className="admin-editor-main">
-          <section className="admin-panel admin-form-section">
-            <div className="admin-panel-heading">
+          <Card className="admin-form-card gap-5 p-6">
+            <CardHeader className="admin-panel-heading">
               <h2>Requested items</h2>
-              <span className={`admin-status ${order.status}`}>
-                {order.status.replaceAll('_', ' ')}
-              </span>
-            </div>
+              <StatusBadge status={order.status}>{order.status.replaceAll('_', ' ')}</StatusBadge>
+            </CardHeader>
             {order.items.map((item, index) => (
               <div key={index} className="admin-order-item">
                 <div>
@@ -87,8 +88,8 @@ export default async function ReviewOrder({ params }: { params: Promise<{ id: st
                     ? 'Cash on delivery. Review stock and confirm this request before fulfilment.'
                     : 'These item and delivery prices were saved when the customer submitted the request. Payment is arranged separately.'}
             </p>
-          </section>
-          <section className="admin-panel admin-form-section">
+          </Card>
+          <Card className="admin-form-card gap-5 p-6">
             <h2>Delivery details</h2>
             <address className="admin-address">
               <strong>{order.shipping.name}</strong>
@@ -109,12 +110,12 @@ export default async function ReviewOrder({ params }: { params: Promise<{ id: st
                 <p>{order.shipping.notes}</p>
               </div>
             ) : null}
-          </section>
+          </Card>
         </div>
-        <aside className="admin-panel admin-form-section">
+        <Card className="admin-form-card gap-5 p-6">
           <h2>Manage request</h2>
           <OrderStatus key={order.status} id={order.id} status={order.status} />
-        </aside>
+        </Card>
       </div>
     </>
   );

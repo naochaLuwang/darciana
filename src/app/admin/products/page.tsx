@@ -1,3 +1,16 @@
+import { StatusBadge } from '@/components/admin/common';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
 import Link from 'next/link';
 import { Plus, Search } from 'lucide-react';
 import { adminSession, adminProductSelect, normalizeAdminProduct } from '@/lib/admin';
@@ -31,52 +44,54 @@ export default async function AdminProducts({
     <>
       <AdminHeading
         title="Products"
-        description="Manage the little things your customers come here for."
+        description="Products, pricing and availability"
         action={
-          <Link href="/admin/products/new" className="button button-dark">
-            <Plus size={17} /> Add product
-          </Link>
+          <Button asChild>
+            <Link href="/admin/products/new">
+              <Plus size={17} /> Add product
+            </Link>
+          </Button>
         }
       />
       <form className="admin-filterbar">
         <div>
           <Search size={18} />
-          <input
+          <Input
             name="q"
             aria-label="Search product names"
             defaultValue={q}
             placeholder="Search product names"
           />
         </div>
-        <select name="status" aria-label="Product visibility" defaultValue={status}>
-          <option value="">All products</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
-        <button className="button button-outline">Search</button>
+        <NativeSelect name="status" aria-label="Product visibility" defaultValue={status}>
+          <NativeSelectOption value="">All products</NativeSelectOption>
+          <NativeSelectOption value="active">Active</NativeSelectOption>
+          <NativeSelectOption value="inactive">Inactive</NativeSelectOption>
+        </NativeSelect>
+        <Button variant="outline">Search</Button>
       </form>
       {result.error ? (
         <AdminNotice>Products could not load. Check your admin setup and try again.</AdminNotice>
       ) : (
-        <section className="admin-panel admin-table-panel">
-          <div className="admin-table-scroll">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>Status</th>
-                  <th>Price</th>
-                  <th>Stock</th>
-                  <th>Options</th>
-                  <th>
+        <Card className="admin-table-panel gap-0 overflow-hidden py-0">
+          <div className="min-w-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Price</TableHead>
+                  <TableHead>Stock</TableHead>
+                  <TableHead>Options</TableHead>
+                  <TableHead>
                     <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {products.map((product) => (
-                  <tr key={product.id}>
-                    <td>
+                  <TableRow key={product.id}>
+                    <TableCell>
                       <Link className="admin-product-cell" href={`/admin/products/${product.id}`}>
                         <span className="admin-thumbnail">
                           <ProductImage src={product.thumbnail_url} alt="" />
@@ -86,19 +101,19 @@ export default async function AdminProducts({
                           <small>{product.brand || 'No brand'}</small>
                         </span>
                       </Link>
-                    </td>
-                    <td>
-                      <span className={`admin-status ${product.status}`}>{product.status}</span>
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={product.status}>{product.status}</StatusBadge>
+                    </TableCell>
+                    <TableCell>
                       {product.has_variants ? 'From ' : ''}
                       {money(startingPrice(product))}
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell>
                       {product.product_variants.reduce((sum, variant) => sum + variant.stock, 0)}
-                    </td>
-                    <td>{product.product_variants.length}</td>
-                    <td>
+                    </TableCell>
+                    <TableCell>{product.product_variants.length}</TableCell>
+                    <TableCell>
                       <div className="admin-product-actions">
                         <Link className="text-link" href={`/admin/products/${product.id}`}>
                           Edit →
@@ -109,11 +124,11 @@ export default async function AdminProducts({
                           updatedAt={product.updated_at}
                         />
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
           {!products.length ? (
             <div className="admin-empty">
@@ -126,7 +141,7 @@ export default async function AdminProducts({
             count={result.count ?? 0}
             href={`/admin/products?${new URLSearchParams({ q, status })}`}
           />
-        </section>
+        </Card>
       )}
     </>
   );

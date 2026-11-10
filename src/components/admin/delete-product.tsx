@@ -1,127 +1,122 @@
 'use client';
-
-import { useEffect, useId, useRef, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { createPortal } from 'react-dom';
 import { Trash2 } from 'lucide-react';
 import { deleteProduct } from '@/app/admin/actions';
-
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { FieldError } from '@/components/ui/field';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { AdminField } from './form-controls';
 type Product = { id: string; name: string; updatedAt: string };
-
-function DeleteProductDialog({ product, onClose }: { product: Product; onClose: () => void }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-  const descriptionId = useId();
-  const router = useRouter();
+export function DeleteProduct(product: Product) {
+  const [open, setOpen] = useState(false);
   const [confirmation, setConfirmation] = useState('');
   const [error, setError] = useState('');
   const [pending, startTransition] = useTransition();
-  useEffect(() => {
-    const element = dialog.current!;
-    element.showModal();
-    return () => element.close();
-  }, []);
-
+  const router = useRouter();
   return (
-    <dialog
-      ref={dialog}
-      className="admin-delete-dialog"
-      aria-labelledby={titleId}
-      aria-describedby={descriptionId}
-      onCancel={(event) => {
-        if (pending) event.preventDefault();
-      }}
-      onClose={() => {
-        if (!dialog.current?.open) onClose();
+    <Dialog
+      open={open}
+      onOpenChange={(value) => {
+        if (pending) return;
+        setOpen(value);
+        setConfirmation('');
+        setError('');
       }}
     >
-      <h2 id={titleId}>Delete product?</h2>
-      <p className="admin-delete-name">{product.name}</p>
-      <p id={descriptionId}>
-        This permanently deletes the product and all its options. Existing orders are kept.
-      </p>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          setError('');
-          startTransition(async () => {
-            try {
-              const result = await deleteProduct({
-                id: product.id,
-                expected_updated_at: product.updatedAt,
-                confirmation,
-              });
-              if (result.error) setError(result.error);
-              else {
-                onClose();
-                router.refresh();
-              }
-            } catch {
-              setError('Could not delete this product. Try again.');
-            }
-          });
+      <DialogTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="text-destructive hover:bg-destructive/5 hover:text-destructive"
+          aria-label={`Delete ${product.name}`}
+        >
+          <Trash2 />
+          Delete
+        </Button>
+      </DialogTrigger>
+      <DialogContent
+        showCloseButton={false}
+        onEscapeKeyDown={(event) => {
+          if (pending) event.preventDefault();
+        }}
+        onInteractOutside={(event) => {
+          if (pending) event.preventDefault();
         }}
       >
-        <label>
-          Type DELETE to confirm
-          <input
-            value={confirmation}
-            onChange={(event) => setConfirmation(event.target.value)}
-            autoComplete="off"
-            spellCheck={false}
-            maxLength={6}
-            pattern="DELETE"
-            required
-            disabled={pending}
-          />
-        </label>
-        {error ? (
-          <p role="alert" className="form-error">
-            {error}
-          </p>
-        ) : null}
-        <div className="admin-delete-actions">
-          <button
-            type="button"
-            className="button button-outline"
-            onClick={onClose}
-            disabled={pending}
-            autoFocus
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="button button-danger"
-            disabled={pending || confirmation !== 'DELETE'}
-          >
-            {pending ? 'Deleting…' : 'Delete permanently'}
-          </button>
-        </div>
-      </form>
-    </dialog>
-  );
-}
-
-export function DeleteProduct(product: Product) {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <button
-        type="button"
-        className="text-link admin-delete-product"
-        aria-label={`Delete ${product.name}`}
-        onClick={() => setOpen(true)}
-      >
-        <Trash2 size={16} />
-        Delete
-      </button>
-      {open
-        ? createPortal(
-            <DeleteProductDialog product={product} onClose={() => setOpen(false)} />,
-            document.querySelector('.admin-root') ?? document.body,
-          )
-        : null}
-    </>
+        <DialogHeader>
+          <DialogTitle>Delete product?</DialogTitle>
+          <DialogDescription>
+            This permanently deletes the product and all its options. Existing orders are kept.
+          </DialogDescription>
+        </DialogHeader>
+        <p className="rounded-md border bg-muted/50 p-3 text-sm font-medium">{product.name}</p>
+        <form
+          className="space-y-5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setError('');
+            startTransition(async () => {
+              try {
+                const result = await deleteProduct({
+                  id: product.id,
+                  expected_updated_at: product.updatedAt,
+                  confirmation,
+                });
+                if (result.error) setError(result.error);
+                else {
+                  setOpen(false);
+                  router.refresh();
+                }
+              } catch {
+                setError('Could not delete this product. Try again.');
+              }
+            });
+          }}
+        >
+          <AdminField label="Type DELETE to confirm">
+            <Input
+              value={confirmation}
+              onChange={(event) => setConfirmation(event.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={6}
+              pattern="DELETE"
+              required
+              disabled={pending}
+            />
+          </AdminField>
+          {error ? <FieldError>{error}</FieldError> : null}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+              disabled={pending}
+              autoFocus
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="destructive"
+              disabled={pending || confirmation !== 'DELETE'}
+            >
+              {pending ? 'Deleting…' : 'Delete permanently'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

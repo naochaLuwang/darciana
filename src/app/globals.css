@@ -3,8 +3,8 @@
 @import '../components/ui/theme.css';
 
 @theme inline {
-  --color-background: #faf9f7;
-  --color-foreground: #2c221c;
+  --color-background: var(--ui-background, #faf9f7);
+  --color-foreground: var(--ui-foreground, #2c221c);
   --font-sans: Arial, Helvetica, sans-serif;
 }
 :root {
@@ -59,7 +59,7 @@ button,
 a {
   touch-action: manipulation;
 }
-a {
+a:not([data-slot]) {
   color: inherit;
   text-decoration: none;
 }

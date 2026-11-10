@@ -1,8 +1,18 @@
+import { Card, CardHeader } from '@/components/ui/card';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
 import { adminSession } from '@/lib/admin';
 import { contentWriter } from '@/lib/store-content-server';
 import { firebaseConfigured } from '@/lib/firebase-server';
 import { pushError } from '@/lib/push';
 import { AdminHeading, AdminNotice, adminDate } from '@/components/admin/common';
+import { NotificationHistory } from '@/components/admin/notification-history';
 import { NotificationEditor } from '@/components/admin/notification-editor';
 import { resendConfig } from '@/lib/resend-server';
 import Link from 'next/link';
@@ -45,99 +55,105 @@ export default async function NotificationsPage() {
       ) : null}
       {error ? <AdminNotice>{pushError(error)}</AdminNotice> : null}
       <NotificationEditor configured={configured && !error} devices={announcements?.count ?? 0} />
-      <section className="admin-panel admin-push-history">
-        <div className="admin-panel-heading">
-          <h2>Sending history</h2>
-        </div>
-        {history?.data?.length ? (
-          <div className="admin-table-scroll">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Notification</th>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th>Sent</th>
-                  <th>Failed</th>
-                  <th>Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.data.map((row) => (
-                  <tr key={row.id}>
-                    <td>
-                      <strong>{row.title}</strong>
-                    </td>
-                    <td>
-                      {row.audience === 'admin_order'
-                        ? 'New order alert'
-                        : row.audience === 'order'
-                          ? 'Order update'
-                          : 'Announcement'}
-                    </td>
-                    <td>{row.status === 'empty' ? 'No devices' : row.status}</td>
-                    <td>{row.success_count}</td>
-                    <td>{row.failure_count}</td>
-                    <td>{adminDate(row.created_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="admin-help admin-push-empty">No notifications sent yet.</p>
-        )}
-      </section>
-      <section className="admin-panel admin-push-history">
-        <div className="admin-panel-heading">
-          <h2>Order emails</h2>
-        </div>
-        {!resendConfig() ? (
-          <AdminNotice>
-            Configure RESEND_API_KEY and RESEND_FROM_EMAIL on the website server.
-          </AdminNotice>
-        ) : null}
-        {emails?.error ? (
-          <AdminNotice>Run the order email setup SQL to enable sending history.</AdminNotice>
-        ) : emails?.data?.length ? (
-          <div className="admin-table-scroll">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Order</th>
-                  <th>Update</th>
-                  <th>Email status</th>
-                  <th>Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {emails.data.map((row) => (
-                  <tr key={row.id}>
-                    <td>
-                      {row.order_id ? (
-                        <Link href={`/admin/orders/${row.order_id}`}>
-                          #{row.order_id.slice(0, 8).toUpperCase()}
-                        </Link>
-                      ) : (
-                        'Deleted order'
-                      )}
-                    </td>
-                    <td>{row.order_status.replaceAll('_', ' ')}</td>
-                    <td>
-                      {row.status === 'sent'
-                        ? 'Accepted by Resend'
-                        : row.status.replaceAll('_', ' ')}
-                    </td>
-                    <td>{adminDate(row.created_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="admin-help admin-push-empty">No order emails yet.</p>
-        )}
-      </section>
+      <NotificationHistory
+        push={
+          <Card className="admin-push-history gap-0 overflow-hidden py-0">
+            <CardHeader className="admin-panel-heading">
+              <h2>Sending history</h2>
+            </CardHeader>
+            {history?.data?.length ? (
+              <div className="min-w-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Notification</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Sent</TableHead>
+                      <TableHead>Failed</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {history.data.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell>
+                          <strong>{row.title}</strong>
+                        </TableCell>
+                        <TableCell>
+                          {row.audience === 'admin_order'
+                            ? 'New order alert'
+                            : row.audience === 'order'
+                              ? 'Order update'
+                              : 'Announcement'}
+                        </TableCell>
+                        <TableCell>{row.status === 'empty' ? 'No devices' : row.status}</TableCell>
+                        <TableCell>{row.success_count}</TableCell>
+                        <TableCell>{row.failure_count}</TableCell>
+                        <TableCell>{adminDate(row.created_at)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <p className="admin-help admin-push-empty">No notifications sent yet.</p>
+            )}
+          </Card>
+        }
+        emails={
+          <Card className="admin-push-history gap-0 overflow-hidden py-0">
+            <CardHeader className="admin-panel-heading">
+              <h2>Order emails</h2>
+            </CardHeader>
+            {!resendConfig() ? (
+              <AdminNotice>
+                Configure RESEND_API_KEY and RESEND_FROM_EMAIL on the website server.
+              </AdminNotice>
+            ) : null}
+            {emails?.error ? (
+              <AdminNotice>Run the order email setup SQL to enable sending history.</AdminNotice>
+            ) : emails?.data?.length ? (
+              <div className="min-w-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Order</TableHead>
+                      <TableHead>Update</TableHead>
+                      <TableHead>Email status</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {emails.data.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell>
+                          {row.order_id ? (
+                            <Link href={`/admin/orders/${row.order_id}`}>
+                              #{row.order_id.slice(0, 8).toUpperCase()}
+                            </Link>
+                          ) : (
+                            'Deleted order'
+                          )}
+                        </TableCell>
+                        <TableCell>{row.order_status.replaceAll('_', ' ')}</TableCell>
+                        <TableCell>
+                          {row.status === 'sent'
+                            ? 'Accepted by Resend'
+                            : row.status.replaceAll('_', ' ')}
+                        </TableCell>
+                        <TableCell>{adminDate(row.created_at)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <p className="admin-help admin-push-empty">No order emails yet.</p>
+            )}
+          </Card>
+        }
+      />
     </>
   );
 }

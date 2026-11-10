@@ -22,10 +22,7 @@ export default async function EditProduct({ params }: { params: Promise<{ id: st
   if (!product.data) notFound();
   return (
     <>
-      <AdminHeading
-        title="Edit product"
-        description="Keep the details, options, and stock up to date."
-      />
+      <AdminHeading title="Edit product" description="Update details, pricing and stock" />
       <ProductEditor
         initial={normalizeAdminProduct(product.data)}
         categories={categories.data ?? []}

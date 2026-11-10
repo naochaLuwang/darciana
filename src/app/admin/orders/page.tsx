@@ -1,3 +1,15 @@
+import { StatusBadge } from '@/components/admin/common';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
 import Link from 'next/link';
 import { adminSession, type AdminOrder } from '@/lib/admin';
 import { money } from '@/lib/commerce';
@@ -39,17 +51,19 @@ export default async function Orders({
     <>
       <AdminHeading
         title="Order requests"
-        description="Review delivery details and move requests through confirmation and fulfilment."
+        description="Confirm, fulfil and track customer orders"
       />
       <form className="admin-filterbar">
-        <select name="status" aria-label="Request status" defaultValue={status}>
-          <option value="">All statuses</option>
-          <option value="awaiting_confirmation">Awaiting confirmation</option>
-          <option value="confirmed">Confirmed</option>
-          <option value="completed">Completed</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-        <button className="button button-outline">Apply filter</button>
+        <NativeSelect name="status" aria-label="Request status" defaultValue={status}>
+          <NativeSelectOption value="">All statuses</NativeSelectOption>
+          <NativeSelectOption value="awaiting_confirmation">
+            Awaiting confirmation
+          </NativeSelectOption>
+          <NativeSelectOption value="confirmed">Confirmed</NativeSelectOption>
+          <NativeSelectOption value="completed">Completed</NativeSelectOption>
+          <NativeSelectOption value="cancelled">Cancelled</NativeSelectOption>
+        </NativeSelect>
+        <Button variant="outline">Apply filter</Button>
       </form>
       {result.error ? (
         <AdminNotice>
@@ -57,59 +71,59 @@ export default async function Orders({
           pending.
         </AdminNotice>
       ) : (
-        <section className="admin-panel admin-table-panel">
-          <div className="admin-table-scroll">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Request</th>
-                  <th>Customer</th>
-                  <th>Status</th>
-                  <th>Total</th>
-                  <th>Received (IST)</th>
-                  <th>
+        <Card className="admin-table-panel gap-0 overflow-hidden py-0">
+          <div className="min-w-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Request</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Total</TableHead>
+                  <TableHead>Received (IST)</TableHead>
+                  <TableHead>
                     <span className="sr-only">View request</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {orders.map((order) => (
-                  <tr key={order.id}>
-                    <td>
+                  <TableRow key={order.id}>
+                    <TableCell>
                       <Link href={`/admin/orders/${order.id}`}>
                         <strong>#{order.id.slice(0, 8).toUpperCase()}</strong>
                         <small>
                           {order.items.reduce((sum, item) => sum + item.quantity, 0)} items
                         </small>
                       </Link>
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell>
                       <strong>{order.shipping.name}</strong>
                       <small>{order.shipping.city}</small>
-                    </td>
-                    <td>
-                      <span className={`admin-status ${order.status}`}>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={order.status}>
                         {order.status.replaceAll('_', ' ')}
-                      </span>
-                    </td>
-                    <td>
+                      </StatusBadge>
+                    </TableCell>
+                    <TableCell>
                       {money(order.order_total ?? order.item_total)}
                       <small>
                         {order.order_total == null
                           ? 'Delivery not yet priced'
                           : `Includes ${order.shipping_price === 0 ? 'free delivery' : `${money(order.shipping_price ?? 0)} delivery`}`}
                       </small>
-                    </td>
-                    <td>{adminDate(order.created_at)}</td>
-                    <td>
+                    </TableCell>
+                    <TableCell>{adminDate(order.created_at)}</TableCell>
+                    <TableCell>
                       <Link className="text-link" href={`/admin/orders/${order.id}`}>
                         Review →
                       </Link>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
           {!orders.length ? (
             <div className="admin-empty">
@@ -122,7 +136,7 @@ export default async function Orders({
             count={result.count ?? 0}
             href={`/admin/orders?${new URLSearchParams({ status })}`}
           />
-        </section>
+        </Card>
       )}
     </>
   );

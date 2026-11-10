@@ -1,3 +1,4 @@
+import { Card, CardHeader } from '@/components/ui/card';
 import Link from 'next/link';
 import { adminSession } from '@/lib/admin';
 import { AdminHeading, AdminNotice } from '@/components/admin/common';
@@ -23,7 +24,7 @@ export default async function AdminCategories({
     <>
       <AdminHeading
         title="Categories"
-        description="Organise your cosmetics, stationery, and the collections underneath them."
+        description="Collections and subcategories for your storefront"
       />
       {params.saved === '1' ? (
         <p className="form-success" role="status">
@@ -34,11 +35,11 @@ export default async function AdminCategories({
         <AdminNotice>Categories could not load. Refresh and try again.</AdminNotice>
       ) : (
         <div className="admin-category-layout">
-          <section className="admin-panel">
-            <div className="admin-panel-heading">
+          <Card className="gap-0 overflow-hidden py-0">
+            <CardHeader className="admin-panel-heading">
               <h2>Your collections</h2>
               <span>{categories.length} categories</span>
-            </div>
+            </CardHeader>
             <div className="admin-category-list">
               {categories.map((category) => (
                 <Link
@@ -69,7 +70,7 @@ export default async function AdminCategories({
                 <p>Add your first collection to get started.</p>
               </div>
             ) : null}
-          </section>
+          </Card>
           <CategoryEditor key={initial?.id ?? 'new'} initial={initial} categories={categories} />
         </div>
       )}

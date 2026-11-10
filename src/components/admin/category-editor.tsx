@@ -1,4 +1,9 @@
 'use client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { AdminField, AdminSelect, FormReady } from './form-controls';
+import { Card } from '@/components/ui/card';
+
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -25,90 +30,89 @@ export function CategoryEditor({
   const router = useRouter();
   const excluded = initial ? categoryTreeIds(categories, initial.id) : [];
   return (
-    <form
-      className="admin-panel admin-form-section"
-      onSubmit={(event) => {
-        event.preventDefault();
-        setError('');
-        startTransition(async () => {
-          try {
-            const result = await saveCategory({
-              id: initial?.id ?? null,
-              name,
-              slug,
-              parent_id: parent || null,
-              image_url: image,
-            });
-            if (result.error) setError(result.error);
-            else {
-              router.push('/admin/categories?saved=1');
-              router.refresh();
+    <Card className="gap-0 py-0">
+      <form
+        className="admin-form-card p-5 sm:p-6"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setError('');
+          startTransition(async () => {
+            try {
+              const result = await saveCategory({
+                id: initial?.id ?? null,
+                name,
+                slug,
+                parent_id: parent || null,
+                image_url: image,
+              });
+              if (result.error) setError(result.error);
+              else {
+                router.push('/admin/categories?saved=1');
+                router.refresh();
+              }
+            } catch {
+              setError('Could not save the category. Please try again.');
             }
-          } catch {
-            setError('Could not save the category. Please try again.');
-          }
-        });
-      }}
-    >
-      <h2>{initial ? 'Edit category' : 'Add a category'}</h2>
-      <label>
-        Category name
-        <input
-          required
-          maxLength={120}
-          value={name}
-          onChange={(event) => {
-            setName(event.target.value);
-            if (!slugEdited) setSlug(slugify(event.target.value));
-          }}
-        />
-      </label>
-      <label>
-        URL slug
-        <input
-          required
-          maxLength={160}
-          value={slug}
-          onBlur={() => setSlug(normalizeCategorySlug(slug))}
-          onChange={(event) => {
-            setSlugEdited(true);
-            setSlug(event.target.value);
-          }}
-        />
-      </label>
-      <label>
-        Parent category
-        <select value={parent} onChange={(event) => setParent(event.target.value)}>
-          <option value="">No parent — top-level category</option>
-          {categories
-            .filter((category) => !excluded.includes(category.id))
-            .map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-        </select>
-      </label>
-      <ImageField
-        label="Category image"
-        value={image}
-        onChange={setImage}
-        onBusy={setBusy}
-        folder="categories"
-      />
-      {error ? (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      <button className="button button-dark" disabled={pending || busy}>
-        {pending ? 'Saving…' : 'Save category'}
-      </button>
-      {initial ? (
-        <Link href="/admin/categories" className="text-link">
-          Cancel edit
-        </Link>
-      ) : null}
-    </form>
+          });
+        }}
+      >
+        <FormReady>
+          <h2>{initial ? 'Edit category' : 'Add a category'}</h2>
+          <AdminField label="Category name">
+            <Input
+              required
+              maxLength={120}
+              value={name}
+              onChange={(event) => {
+                setName(event.target.value);
+                if (!slugEdited) setSlug(slugify(event.target.value));
+              }}
+            />
+          </AdminField>
+          <AdminField label="URL slug">
+            <Input
+              required
+              maxLength={160}
+              value={slug}
+              onBlur={() => setSlug(normalizeCategorySlug(slug))}
+              onChange={(event) => {
+                setSlugEdited(true);
+                setSlug(event.target.value);
+              }}
+            />
+          </AdminField>
+          <AdminField label="Parent category">
+            <AdminSelect
+              value={parent}
+              onValueChange={setParent}
+              options={[
+                { value: '', label: 'No parent — top-level category' },
+                ...categories
+                  .filter((category) => !excluded.includes(category.id))
+                  .map((category) => ({ value: category.id, label: category.name })),
+              ]}
+            />
+          </AdminField>
+          <ImageField
+            label="Category image"
+            value={image}
+            onChange={setImage}
+            onBusy={setBusy}
+            folder="categories"
+          />
+          {error ? (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <Button disabled={pending || busy}>{pending ? 'Saving…' : 'Save category'}</Button>
+          {initial ? (
+            <Link href="/admin/categories" className="text-link">
+              Cancel edit
+            </Link>
+          ) : null}
+        </FormReady>
+      </form>
+    </Card>
   );
 }

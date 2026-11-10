@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { getAdminContext } from '@/lib/admin';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { AdminLogin } from '@/components/admin/admin-login';
@@ -20,7 +22,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {context.state === 'signed_out' ? (
             <AdminLogin />
           ) : (
-            <div className="admin-access-card">
+            <Card className="admin-access-card">
               <AdminBrand className="admin-login-brand" />
               <h1>
                 {context.state === 'denied'
@@ -38,10 +40,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               </p>
               {context.user ? (
                 <form action={adminSignOut}>
-                  <button className="button button-dark">Use another account</button>
+                  <Button>Use another account</Button>
                 </form>
               ) : null}
-            </div>
+            </Card>
           )}
           <Link href="/" className="text-link">
             ← Back to the storefront
