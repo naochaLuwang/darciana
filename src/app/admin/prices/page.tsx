@@ -33,10 +33,7 @@ export default async function PricesPage({
   );
   return (
     <>
-      <AdminHeading
-        title="Prices"
-        description="Set prices and discounts for products and options"
-      />
+      <AdminHeading title="Prices" description="Choose a product to update its price" />
       <form className="admin-filterbar">
         <div>
           <Search aria-hidden="true" />
@@ -57,11 +54,11 @@ export default async function PricesPage({
       {result.error ? (
         <AdminNotice>Prices could not load. Refresh and try again.</AdminNotice>
       ) : products.length ? (
-        <div className="space-y-5">
+        <Card className="gap-0 overflow-hidden py-0">
           {products.map((product) => (
             <PriceEditor key={product.id} initial={product} />
           ))}
-        </div>
+        </Card>
       ) : (
         <Card>
           <CardContent className="admin-empty">

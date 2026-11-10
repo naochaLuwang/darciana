@@ -927,14 +927,13 @@ test('shadcn sidebar, account menu and history tabs work without losing admin ac
   await expect(page.getByRole('navigation', { name: 'Admin navigation' })).toHaveCount(0);
 });
 
-test('Prices protects access and saves whole-rupee prices and discounts without changing catalog details', async ({
+test('Prices keeps the list compact and saves whole-rupee discounts in the editor', async ({
   page,
   context,
   request,
 }) => {
   await page.goto('/admin/prices');
   await expect(page.getByRole('heading', { name: 'Admin sign in', exact: true })).toBeVisible();
-  await expect(page.getByLabel('Price (₹)', { exact: true })).toHaveCount(0);
   await signIn(context, CUSTOMER);
   await page.goto('/admin/prices');
   await expect(
@@ -947,12 +946,24 @@ test('Prices protects access and saves whole-rupee prices and discounts without 
     .getByRole('navigation', { name: 'Admin navigation' })
     .getByRole('link', { name: 'Prices', exact: true })
     .click();
-  await expect(page.getByRole('heading', { name: 'Prices', exact: true })).toBeVisible();
-  const card = page.getByRole('article', { name: 'Rose lip tint', exact: true });
-  const price = card.getByLabel('Price (₹)', { exact: true });
-  await expect(price).toHaveValue('399');
-  await expect(card.locator('output')).toHaveText('₹299');
+  const row = page.getByRole('article', { name: 'Rose lip tint', exact: true });
+  const editor = page.getByRole('dialog', { name: 'Rose lip tint', exact: true });
+  const open = async () => {
+    await row.getByRole('button', { name: 'Edit prices for Rose lip tint', exact: true }).click();
+    await expect(editor).toBeVisible();
+  };
+  const save = async () => {
+    await editor.getByRole('button', { name: 'Save changes', exact: true }).click();
+    await expect(editor).toHaveCount(0);
+    await expect(row.getByRole('status')).toHaveText('Saved');
+  };
+  await expect(row).toContainText('₹299');
+  await expect(page.getByLabel('Price (₹)', { exact: true })).toHaveCount(0);
+  await open();
+  const price = editor.getByLabel('Price (₹)', { exact: true });
   const original = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
+  await expect(price).toHaveValue('399');
+  await expect(editor.locator('output')).toHaveText('₹299');
   await price.fill('0');
   await price.press('Backspace');
   await price.blur();
@@ -960,12 +971,12 @@ test('Prices protects access and saves whole-rupee prices and discounts without 
   await price.fill('499.5');
   await price.blur();
   await expect(price).toHaveValue('500');
-  await card.getByLabel('Discount (₹)', { exact: true }).fill('49.5');
-  await card.getByLabel('Discount (₹)', { exact: true }).blur();
-  await expect(card.getByLabel('Discount (₹)', { exact: true })).toHaveValue('50');
-  await expect(card.locator('output')).toHaveText('₹450');
-  await card.getByRole('button', { name: 'Save prices', exact: true }).click();
-  await expect(card.getByText('Prices saved.', { exact: true })).toBeVisible();
+  await editor.getByLabel('Discount (₹)', { exact: true }).fill('49.5');
+  await editor.getByLabel('Discount (₹)', { exact: true }).blur();
+  await expect(editor.getByLabel('Discount (₹)', { exact: true })).toHaveValue('50');
+  await expect(editor.locator('output')).toHaveText('₹450');
+  await save();
+  await expect(row).toContainText('₹450');
   let updated = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
   expect(updated.base_price).toBe(500);
   expect(updated.discount_value).toBe(50);
@@ -984,22 +995,32 @@ test('Prices protects access and saves whole-rupee prices and discounts without 
       original.product_variants[0][field] ?? '',
     );
   expect(updated.product_categories).toEqual(original.product_categories);
-  await choose(page, 'Discount', 'Percentage off (%)');
-  await card.getByLabel('Discount (%)', { exact: true }).fill('12.5');
-  await expect(card.locator('output')).toHaveText('₹438');
-  await card.getByRole('button', { name: 'Save prices', exact: true }).click();
-  await expect(card.getByText('Prices saved.', { exact: true })).toBeVisible();
+  await open();
+  await choose(page, 'Discount', '% off');
+  await editor.getByLabel('Discount (%)', { exact: true }).fill('12.5');
+  await expect(editor.locator('output')).toHaveText('₹438');
+  await save();
+  await expect(row).toContainText('₹438');
+  await open();
   await choose(page, 'Discount', 'No discount');
-  await card.getByRole('button', { name: 'Save prices', exact: true }).click();
-  await expect(card.getByText('Prices saved.', { exact: true })).toBeVisible();
+  await expect(editor.getByRole('button', { name: 'Add discount', exact: true })).toBeVisible();
+  await save();
+  await expect(row).toContainText('₹500');
+  await open();
   await price.fill('999');
-  await card.getByRole('button', { name: 'Reset', exact: true }).click();
+  await editor.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(row).toContainText('₹500');
+  await open();
   await expect(price).toHaveValue('500');
-  await expect(card.getByRole('button', { name: 'Save prices', exact: true })).toBeDisabled();
+  await expect(editor.getByRole('button', { name: 'Save changes', exact: true })).toBeDisabled();
+  await editor.getByRole('button', { name: 'Add discount', exact: true }).click();
+  await editor.getByLabel('Discount (%)', { exact: true }).fill('10');
+  await expect(editor.locator('output')).toHaveText('₹450');
+  await editor.getByRole('button', { name: 'Cancel', exact: true }).click();
   updated = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
   expect(updated.discount_type).toBe('none');
   expect(updated.discount_value).toBe(0);
-  expect(updated.product_variants[0].discount_value).toBe(0);
+  await expect(page.getByLabel('Price (₹)', { exact: true })).toHaveCount(0);
   await page.evaluate(() => {
     (document.activeElement as HTMLElement)?.blur();
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -1011,7 +1032,7 @@ test('Prices protects access and saves whole-rupee prices and discounts without 
   await expect(page.getByRole('heading', { name: 'No products found', exact: true })).toBeVisible();
 });
 
-test('Prices saves independent variant discounts and fits a phone', async ({
+test('Prices edits one option at a time on a phone and preserves all variant changes', async ({
   page,
   context,
   request,
@@ -1020,24 +1041,29 @@ test('Prices saves independent variant discounts and fits a phone', async ({
   await signIn(context, OWNER);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/admin/prices?q=Colour');
-  const card = page.getByRole('article', { name: 'Colour pencil set', exact: true });
-  const rose = card.getByRole('group', { name: 'Rose', exact: true });
-  const mint = card.getByRole('group', { name: 'Mint', exact: true });
-  const sand = card.getByRole('group', { name: 'Sand', exact: true });
-  await rose.getByLabel('Price (₹)', { exact: true }).fill('400');
-  await rose.getByRole('combobox', { name: 'Discount', exact: true }).click();
-  await page.getByRole('option', { name: 'Percentage off (%)', exact: true }).click();
-  await rose.getByLabel('Discount (%)', { exact: true }).fill('50');
-  await mint.getByLabel('Price (₹)', { exact: true }).fill('300');
-  await mint.getByRole('combobox', { name: 'Discount', exact: true }).click();
-  await page.getByRole('option', { name: 'No discount', exact: true }).click();
-  await sand.getByLabel('Price (₹)', { exact: true }).fill('250');
-  await sand.getByLabel('Discount (₹)', { exact: true }).fill('25');
-  await expect(rose.locator('output')).toHaveText('₹200');
-  await expect(mint.locator('output')).toHaveText('₹300');
-  await expect(sand.locator('output')).toHaveText('₹225');
-  await card.getByRole('button', { name: 'Save prices', exact: true }).click();
-  await expect(card.getByText('Prices saved.', { exact: true })).toBeVisible();
+  const row = page.getByRole('article', { name: 'Colour pencil set', exact: true });
+  const editor = page.getByRole('dialog', { name: 'Colour pencil set', exact: true });
+  await expect(page.getByLabel('Price (₹)', { exact: true })).toHaveCount(0);
+  await row.getByRole('button', { name: 'Edit prices for Colour pencil set', exact: true }).click();
+  await expect(editor.getByLabel('Price (₹)', { exact: true })).toHaveCount(1);
+  await choose(page, 'Option', 'Rose');
+  await editor.getByLabel('Price (₹)', { exact: true }).fill('400');
+  await choose(page, 'Discount', '% off');
+  await editor.getByLabel('Discount (%)', { exact: true }).fill('50');
+  await expect(editor.locator('output')).toHaveText('₹200');
+  await choose(page, 'Option', 'Mint');
+  await editor.getByLabel('Price (₹)', { exact: true }).fill('300');
+  await choose(page, 'Discount', 'No discount');
+  await expect(editor.locator('output')).toHaveText('₹300');
+  await choose(page, 'Option', 'Sand');
+  await editor.getByLabel('Price (₹)', { exact: true }).fill('250');
+  await editor.getByLabel('Discount (₹)', { exact: true }).fill('25');
+  await expect(editor.locator('output')).toHaveText('₹225');
+  expect(await editor.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/admin-prices-editor-phone.png', fullPage: true });
+  await editor.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  await expect(row).toContainText('From ₹200');
   const products = await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json();
   const saved = products.find((product: { slug: string }) => product.slug === 'colour-pencil-set');
   expect(saved.has_variants).toBe(true);
@@ -1058,6 +1084,7 @@ test('Prices saves independent variant discounts and fits a phone', async ({
   expect(
     saved.product_variants.map((variant: { is_default: boolean }) => variant.is_default),
   ).toEqual([true, false, false]);
+  await expect(page.getByLabel('Price (₹)', { exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.evaluate(() => {
     (document.activeElement as HTMLElement)?.blur();
@@ -1066,14 +1093,16 @@ test('Prices saves independent variant discounts and fits a phone', async ({
   await page.screenshot({ path: 'test-results/admin-prices-phone.png', fullPage: true });
 });
 
-test('Prices rejects a stale edit after stock changes and reloads the current product before retrying', async ({
+test('Prices rejects a stale edit after stock changes and reloads before retrying', async ({
   page,
   context,
   request,
 }) => {
   await signIn(context, OWNER);
   await page.goto('/admin/prices');
-  const card = page.getByRole('article', { name: 'Rose lip tint', exact: true });
+  const row = page.getByRole('article', { name: 'Rose lip tint', exact: true });
+  const editor = page.getByRole('dialog', { name: 'Rose lip tint', exact: true });
+  await row.getByRole('button', { name: 'Edit prices for Rose lip tint', exact: true }).click();
   const snapshot = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
   const variant = snapshot.product_variants[0];
   const stock = await request.post(
@@ -1084,20 +1113,50 @@ test('Prices rejects a stale edit after stock changes and reloads the current pr
     },
   );
   expect(stock.ok()).toBe(true);
-  await card.getByLabel('Price (₹)', { exact: true }).fill('450');
-  await card.getByRole('button', { name: 'Save prices', exact: true }).click();
-  await expect(card.getByRole('alert')).toContainText('Someone changed this record');
-  await expect(card.getByRole('button', { name: 'Save prices', exact: true })).toBeDisabled();
+  await editor.getByLabel('Price (₹)', { exact: true }).fill('450');
+  await editor.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(editor.getByRole('alert')).toContainText('Someone changed this record');
+  await expect(editor.getByRole('button', { name: 'Save changes', exact: true })).toBeDisabled();
   let saved = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
   expect(saved.base_price).toBe(399);
   expect(saved.product_variants[0].stock).toBe(9);
-  await card.getByRole('button', { name: 'Refresh prices', exact: true }).click();
-  await expect(card.getByLabel('Price (₹)', { exact: true })).toHaveValue('399');
-  await card.getByLabel('Price (₹)', { exact: true }).fill('450');
-  await card.getByRole('button', { name: 'Save prices', exact: true }).click();
-  await expect(card.getByText('Prices saved.', { exact: true })).toBeVisible();
+  await editor.getByRole('button', { name: 'Refresh prices', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  await row.getByRole('button', { name: 'Edit prices for Rose lip tint', exact: true }).click();
+  await expect(editor.getByLabel('Price (₹)', { exact: true })).toHaveValue('399');
+  await editor.getByLabel('Price (₹)', { exact: true }).fill('450');
+  await editor.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  await expect(row).toContainText('₹350');
   saved = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
   expect(saved.base_price).toBe(450);
   expect(saved.product_variants[0].stock).toBe(9);
   expect(saved.product_variants[0].sku).toBe('ROSE-01');
+});
+
+test('Prices returns to an unfinished option instead of saving a hidden blank price as zero', async ({
+  page,
+  context,
+  request,
+}) => {
+  await request.get('http://127.0.0.1:54329/__gallery');
+  await signIn(context, OWNER);
+  await page.goto('/admin/prices?q=Colour');
+  await page
+    .getByRole('button', { name: 'Edit prices for Colour pencil set', exact: true })
+    .click();
+  const editor = page.getByRole('dialog', { name: 'Colour pencil set', exact: true });
+  await choose(page, 'Option', 'Rose');
+  await editor.getByLabel('Price (₹)', { exact: true }).fill('');
+  await choose(page, 'Option', 'Mint');
+  await editor.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(editor.getByRole('combobox', { name: 'Option', exact: true })).toHaveText('Rose');
+  await expect(editor.getByLabel('Price (₹)', { exact: true })).toHaveValue('');
+  await expect(editor.getByRole('alert')).toContainText('for Rose');
+  const products = await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json();
+  const saved = products.find((product: { slug: string }) => product.slug === 'colour-pencil-set');
+  expect(saved.product_variants[0].price).toBe(399);
+  await editor.getByLabel('Price (₹)', { exact: true }).fill('450');
+  await editor.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(editor).toHaveCount(0);
 });

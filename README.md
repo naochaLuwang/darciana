@@ -43,7 +43,7 @@ Tailwind v4 runs through the standard `@tailwindcss/postcss` configuration in `p
 
 Open [http://localhost:3000/admin](http://localhost:3000/admin). The admin console has its own responsive navigation, separate from the customer app tabs.
 
-Use **Admin → Prices** (`/admin/prices`) to update prices and discounts. Each product has its own **Save prices** button, and **Reset** restores its last saved values. Variant products show a separate price and discount for each option. This section uses the existing authenticated product-save transaction, so an installed admin dashboard needs no new SQL setup. Stale edits are rejected if another change happens before saving.
+Use **Admin → Prices** (`/admin/prices`) to update prices and discounts. The page shows a compact product list. Select a product to open its price editor, choose an option if needed, then use **Save changes**. **Add discount** reveals optional discount controls; **Cancel** discards unsaved edits. This section uses the existing authenticated product-save transaction, so an installed admin dashboard needs no new SQL setup. Stale edits are rejected if another change happens before saving.
 
 The UI and database scripts are implemented. Read-only inspection confirmed the live storefront tables and RPCs, including profiles and saved addresses. Owner sign-in, storage policies, and live mutations still need verification. No live catalog records, orders, or auth accounts were changed while building this dashboard.
 
