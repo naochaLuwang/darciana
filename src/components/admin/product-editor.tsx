@@ -42,7 +42,9 @@ export function ProductEditor({
   const [description, setDescription] = useState(initial?.description ?? '');
   const [status, setStatus] = useState(initial?.status ?? 'inactive');
   const [hasVariants, setHasVariants] = useState(initial?.has_variants ?? false);
-  const [basePrice, setBasePrice] = useState(roundRupees(initial?.base_price ?? 0));
+  const [basePrice, setBasePrice] = useState(
+    initial?.base_price == null ? '' : String(roundRupees(initial.base_price)),
+  );
   const [discountType, setDiscountType] = useState(initial?.discount_type ?? 'none');
   const [discountValue, setDiscountValue] = useState(
     initial?.discount_type === 'amount'
@@ -93,6 +95,11 @@ export function ProductEditor({
   function submit() {
     setError('');
     setSuccess('');
+    if (!hasVariants && basePrice === '') {
+      setError('Enter a base price.');
+      return;
+    }
+    const basePriceAmount = roundRupees(Number(basePrice));
     const data = {
       id: initial?.id ?? null,
       expected_updated_at: initial?.updated_at ?? null,
@@ -102,14 +109,14 @@ export function ProductEditor({
       description,
       status,
       has_variants: hasVariants,
-      base_price: hasVariants ? null : basePrice,
+      base_price: hasVariants ? null : basePriceAmount,
       thumbnail_url: image,
       category_ids: categoryIds,
       discount_type: hasVariants ? 'none' : discountType,
       discount_value: hasVariants || discountType === 'none' ? 0 : discountValue,
       variants: variants.map(({ key: _key, ...variant }) => ({
         ...variant,
-        price: hasVariants ? variant.price : basePrice,
+        price: hasVariants ? variant.price : basePriceAmount,
         discount_type: hasVariants ? variant.discount_type : discountType,
         discount_value: hasVariants
           ? variant.discount_type === 'none'
@@ -222,9 +229,13 @@ export function ProductEditor({
                   min="0"
                   max="1000000"
                   step="1"
+                  inputMode="numeric"
                   value={basePrice}
-                  onChange={(event) => setBasePrice(Number(event.target.value))}
-                  onBlur={(event) => setBasePrice(roundRupees(Number(event.currentTarget.value)))}
+                  onChange={(event) => setBasePrice(event.target.value)}
+                  onBlur={(event) => {
+                    const value = event.currentTarget.value;
+                    if (value !== '') setBasePrice(String(roundRupees(Number(value))));
+                  }}
                 />
               </label>
               <label>

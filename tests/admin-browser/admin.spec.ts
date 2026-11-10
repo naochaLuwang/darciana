@@ -32,6 +32,11 @@ test('whole rupees stay consistent across admin inputs, percentage discounts, ba
   await page.goto('/admin/products/33333333-3333-4333-8333-333333333333');
   const base = page.getByLabel('Base price (₹)', { exact: true });
   await expect(base).toHaveAttribute('step', '1');
+  await base.fill('0');
+  await base.press('Backspace');
+  await expect(base).toHaveValue('');
+  await base.blur();
+  await expect(base).toHaveValue('');
   await base.fill('999.5');
   await base.blur();
   await expect(base).toHaveValue('1000');
@@ -265,6 +270,7 @@ test('owner can manage products, categories, stock and request status', async ({
   await page.getByRole('link', { name: 'Add product', exact: true }).click();
   await page.getByLabel('Product name', { exact: true }).fill('Peach lip balm');
   await page.getByLabel('Brand', { exact: true }).fill('Darciana');
+  await expect(page.getByLabel('Base price (₹)', { exact: true })).toHaveValue('');
   await page.getByLabel('Base price (₹)', { exact: true }).fill('249');
   await page.getByLabel('Option 1 SKU').fill('PEACH-01');
   await page.getByLabel('Option 1 stock').fill('8');
