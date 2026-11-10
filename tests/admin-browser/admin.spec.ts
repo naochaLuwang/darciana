@@ -926,3 +926,178 @@ test('shadcn sidebar, account menu and history tabs work without losing admin ac
   await expect(page.getByRole('heading', { name: 'Admin sign in', exact: true })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Admin navigation' })).toHaveCount(0);
 });
+
+test('Prices protects access and saves whole-rupee prices and discounts without changing catalog details', async ({
+  page,
+  context,
+  request,
+}) => {
+  await page.goto('/admin/prices');
+  await expect(page.getByRole('heading', { name: 'Admin sign in', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Price (₹)', { exact: true })).toHaveCount(0);
+  await signIn(context, CUSTOMER);
+  await page.goto('/admin/prices');
+  await expect(
+    page.getByRole('heading', { name: 'Admin access required', exact: true }),
+  ).toBeVisible();
+  await context.clearCookies();
+  await signIn(context, OWNER);
+  await page.goto('/admin');
+  await page
+    .getByRole('navigation', { name: 'Admin navigation' })
+    .getByRole('link', { name: 'Prices', exact: true })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Prices', exact: true })).toBeVisible();
+  const card = page.getByRole('article', { name: 'Rose lip tint', exact: true });
+  const price = card.getByLabel('Price (₹)', { exact: true });
+  await expect(price).toHaveValue('399');
+  await expect(card.locator('output')).toHaveText('₹299');
+  const original = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
+  await price.fill('0');
+  await price.press('Backspace');
+  await price.blur();
+  await expect(price).toHaveValue('');
+  await price.fill('499.5');
+  await price.blur();
+  await expect(price).toHaveValue('500');
+  await card.getByLabel('Discount (₹)', { exact: true }).fill('49.5');
+  await card.getByLabel('Discount (₹)', { exact: true }).blur();
+  await expect(card.getByLabel('Discount (₹)', { exact: true })).toHaveValue('50');
+  await expect(card.locator('output')).toHaveText('₹450');
+  await card.getByRole('button', { name: 'Save prices', exact: true }).click();
+  await expect(card.getByText('Prices saved.', { exact: true })).toBeVisible();
+  let updated = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
+  expect(updated.base_price).toBe(500);
+  expect(updated.discount_value).toBe(50);
+  for (const field of [
+    'name',
+    'slug',
+    'brand',
+    'description',
+    'status',
+    'thumbnail_url',
+    'category_id',
+  ])
+    expect(updated[field] ?? '').toEqual(original[field] ?? '');
+  for (const field of ['id', 'sku', 'stock', 'title', 'is_default', 'image_url', 'hex_code'])
+    expect(updated.product_variants[0][field] ?? '').toEqual(
+      original.product_variants[0][field] ?? '',
+    );
+  expect(updated.product_categories).toEqual(original.product_categories);
+  await choose(page, 'Discount', 'Percentage off (%)');
+  await card.getByLabel('Discount (%)', { exact: true }).fill('12.5');
+  await expect(card.locator('output')).toHaveText('₹438');
+  await card.getByRole('button', { name: 'Save prices', exact: true }).click();
+  await expect(card.getByText('Prices saved.', { exact: true })).toBeVisible();
+  await choose(page, 'Discount', 'No discount');
+  await card.getByRole('button', { name: 'Save prices', exact: true }).click();
+  await expect(card.getByText('Prices saved.', { exact: true })).toBeVisible();
+  await price.fill('999');
+  await card.getByRole('button', { name: 'Reset', exact: true }).click();
+  await expect(price).toHaveValue('500');
+  await expect(card.getByRole('button', { name: 'Save prices', exact: true })).toBeDisabled();
+  updated = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
+  expect(updated.discount_type).toBe('none');
+  expect(updated.discount_value).toBe(0);
+  expect(updated.product_variants[0].discount_value).toBe(0);
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement)?.blur();
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  });
+  await page.screenshot({ path: 'test-results/admin-prices-desktop.png', fullPage: true });
+  await page.goto('/product/rose-lip-tint');
+  await expect(page.locator('.detail-price')).toContainText('₹500');
+  await page.goto('/admin/prices?q=not-a-product');
+  await expect(page.getByRole('heading', { name: 'No products found', exact: true })).toBeVisible();
+});
+
+test('Prices saves independent variant discounts and fits a phone', async ({
+  page,
+  context,
+  request,
+}) => {
+  await request.get('http://127.0.0.1:54329/__gallery');
+  await signIn(context, OWNER);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/admin/prices?q=Colour');
+  const card = page.getByRole('article', { name: 'Colour pencil set', exact: true });
+  const rose = card.getByRole('group', { name: 'Rose', exact: true });
+  const mint = card.getByRole('group', { name: 'Mint', exact: true });
+  const sand = card.getByRole('group', { name: 'Sand', exact: true });
+  await rose.getByLabel('Price (₹)', { exact: true }).fill('400');
+  await rose.getByRole('combobox', { name: 'Discount', exact: true }).click();
+  await page.getByRole('option', { name: 'Percentage off (%)', exact: true }).click();
+  await rose.getByLabel('Discount (%)', { exact: true }).fill('50');
+  await mint.getByLabel('Price (₹)', { exact: true }).fill('300');
+  await mint.getByRole('combobox', { name: 'Discount', exact: true }).click();
+  await page.getByRole('option', { name: 'No discount', exact: true }).click();
+  await sand.getByLabel('Price (₹)', { exact: true }).fill('250');
+  await sand.getByLabel('Discount (₹)', { exact: true }).fill('25');
+  await expect(rose.locator('output')).toHaveText('₹200');
+  await expect(mint.locator('output')).toHaveText('₹300');
+  await expect(sand.locator('output')).toHaveText('₹225');
+  await card.getByRole('button', { name: 'Save prices', exact: true }).click();
+  await expect(card.getByText('Prices saved.', { exact: true })).toBeVisible();
+  const products = await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json();
+  const saved = products.find((product: { slug: string }) => product.slug === 'colour-pencil-set');
+  expect(saved.has_variants).toBe(true);
+  expect(saved.base_price).toBeNull();
+  expect(saved.discount_type).toBe('none');
+  expect(saved.discount_value).toBe(0);
+  expect(saved.product_variants.map((variant: { price: number }) => variant.price)).toEqual([
+    400, 300, 250,
+  ]);
+  expect(saved.product_variants.map((variant: { sku: string }) => variant.sku)).toEqual([
+    'ROSE',
+    'MINT',
+    'SAND',
+  ]);
+  expect(saved.product_variants.map((variant: { stock: number }) => variant.stock)).toEqual([
+    4, 4, 0,
+  ]);
+  expect(
+    saved.product_variants.map((variant: { is_default: boolean }) => variant.is_default),
+  ).toEqual([true, false, false]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement)?.blur();
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  });
+  await page.screenshot({ path: 'test-results/admin-prices-phone.png', fullPage: true });
+});
+
+test('Prices rejects a stale edit after stock changes and reloads the current product before retrying', async ({
+  page,
+  context,
+  request,
+}) => {
+  await signIn(context, OWNER);
+  await page.goto('/admin/prices');
+  const card = page.getByRole('article', { name: 'Rose lip tint', exact: true });
+  const snapshot = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
+  const variant = snapshot.product_variants[0];
+  const stock = await request.post(
+    'http://127.0.0.1:54329/rest/v1/rpc/storefront_admin_set_stock',
+    {
+      headers: { Authorization: `Bearer ${tokenFor(OWNER)}` },
+      data: { p_variant_id: variant.id, p_stock: 9, p_expected_updated_at: variant.updated_at },
+    },
+  );
+  expect(stock.ok()).toBe(true);
+  await card.getByLabel('Price (₹)', { exact: true }).fill('450');
+  await card.getByRole('button', { name: 'Save prices', exact: true }).click();
+  await expect(card.getByRole('alert')).toContainText('Someone changed this record');
+  await expect(card.getByRole('button', { name: 'Save prices', exact: true })).toBeDisabled();
+  let saved = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
+  expect(saved.base_price).toBe(399);
+  expect(saved.product_variants[0].stock).toBe(9);
+  await card.getByRole('button', { name: 'Refresh prices', exact: true }).click();
+  await expect(card.getByLabel('Price (₹)', { exact: true })).toHaveValue('399');
+  await card.getByLabel('Price (₹)', { exact: true }).fill('450');
+  await card.getByRole('button', { name: 'Save prices', exact: true }).click();
+  await expect(card.getByText('Prices saved.', { exact: true })).toBeVisible();
+  saved = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
+  expect(saved.base_price).toBe(450);
+  expect(saved.product_variants[0].stock).toBe(9);
+  expect(saved.product_variants[0].sku).toBe('ROSE-01');
+});

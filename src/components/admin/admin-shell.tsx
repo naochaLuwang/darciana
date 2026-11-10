@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Package,
+  Tags,
   Boxes,
   Shapes,
   ClipboardList,
@@ -67,6 +68,7 @@ const groups = [
     label: 'Catalog',
     links: [
       { href: '/admin/products', label: 'Products', icon: Package },
+      { href: '/admin/prices', label: 'Prices', icon: Tags },
       { href: '/admin/inventory', label: 'Inventory', icon: Boxes },
       { href: '/admin/categories', label: 'Categories', icon: Shapes },
     ],

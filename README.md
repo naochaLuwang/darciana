@@ -35,12 +35,15 @@ Tailwind v4 runs through the standard `@tailwindcss/postcss` configuration in `p
 - Google sign-in through Supabase PKCE on web and Android; see the [Google setup walkthrough](docs/google-sign-in.md).
 - India delivery form, validated order requests, confirmation screen, and account order history.
 - Protected `/admin` store console with product/option editing, image uploads, stock updates, categories, order-request review, and an activity history.
+- Dedicated **Admin → Prices** for product and variant pricing, amount/percentage discounts, whole-rupee selling-price previews, search and visibility filters.
 - Shipping area names and INR delivery prices in admin, with a searchable area dropdown and delivery-inclusive totals at checkout.
 - Dynamic Support & info and Legal pages, managed in **Admin → More content**.
 
 ## Admin dashboard
 
 Open [http://localhost:3000/admin](http://localhost:3000/admin). The admin console has its own responsive navigation, separate from the customer app tabs.
+
+Use **Admin → Prices** (`/admin/prices`) to update prices and discounts. Each product has its own **Save prices** button, and **Reset** restores its last saved values. Variant products show a separate price and discount for each option. This section uses the existing authenticated product-save transaction, so an installed admin dashboard needs no new SQL setup. Stale edits are rejected if another change happens before saving.
 
 The UI and database scripts are implemented. Read-only inspection confirmed the live storefront tables and RPCs, including profiles and saved addresses. Owner sign-in, storage policies, and live mutations still need verification. No live catalog records, orders, or auth accounts were changed while building this dashboard.
 
