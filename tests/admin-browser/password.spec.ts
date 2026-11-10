@@ -1,0 +1,22 @@
+import { test, expect } from '@playwright/test';
+test('website reset uses PKCE cookies and a one-time recovery grant', async ({ page, request }) => {
+  await request.get('http://127.0.0.1:54329/__reset');
+  await page.goto('/account/reset-password');
+  await expect(page.getByRole('heading', { name: 'Reset link expired' })).toBeVisible();
+  await page.goto('/account');
+  await page.getByRole('link', { name: 'Forgot password?' }).click();
+  await expect(page.getByRole('heading', { name: 'Forgot password', exact: true })).toBeVisible();
+  await page.getByLabel('Email address', { exact: true }).fill('customer@example.com');
+  await page.getByRole('button', { name: 'Send reset link' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'If an account exists' })).toBeVisible();
+  const { url } = await (await request.get('http://127.0.0.1:54329/__recovery/last')).json();
+  await page.goto(url);
+  await expect(page.getByRole('heading', { name: 'Set new password' })).toBeVisible();
+  await page.getByLabel('New password', { exact: true }).fill('updated-test-password');
+  await page.getByLabel('Confirm new password', { exact: true }).fill('updated-test-password');
+  await page.getByRole('button', { name: 'Update password' }).click();
+  await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Password updated' })).toBeVisible();
+  await page.goto('/account/reset-password');
+  await expect(page.getByRole('heading', { name: 'Reset link expired' })).toBeVisible();
+});

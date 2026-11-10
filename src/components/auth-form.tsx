@@ -101,6 +101,11 @@ export function AuthForm({ next = '' }: { next?: string }) {
               </button>
             </div>
           </div>
+          {mode === 'login' ? (
+            <Link href="/account/forgot-password" className="text-link auth-forgot">
+              Forgot password?
+            </Link>
+          ) : null}
           {state.error ? (
             <p className="form-error" role="alert">
               {state.error}

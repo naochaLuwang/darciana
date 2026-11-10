@@ -23,6 +23,8 @@ const secrets = [
   'SUPABASE_SECRET_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
   'FIREBASE_SERVICE_ACCOUNT_BASE64',
+  'ORDER_PUSH_WEBHOOK_SECRET',
+  'RESEND_API_KEY',
 ]
   .map((key) => process.env[key] || env[key])
   .filter(Boolean);
@@ -39,7 +41,7 @@ for (const file of scripts) {
     'A secret API key was found in mobile assets.',
   );
   assert.ok(
-    !/SUPABASE_SECRET_KEY|FIREBASE_SERVICE_ACCOUNT_BASE64|BEGIN PRIVATE KEY|firebase-adminsdk|next\/headers|next\/cache|next\/server/.test(
+    !/SUPABASE_SECRET_KEY|FIREBASE_SERVICE_ACCOUNT_BASE64|ORDER_PUSH_WEBHOOK_SECRET|RESEND_API_KEY|BEGIN PRIVATE KEY|firebase-adminsdk|next\/headers|next\/cache|next\/server/.test(
       code,
     ),
     'Server-only code was found in mobile assets.',

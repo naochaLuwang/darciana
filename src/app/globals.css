@@ -1612,6 +1612,10 @@ body:has(.bag-checkout-dock) .app-content {
   width: 100%;
   font-size: 14px;
 }
+.auth-forgot {
+  justify-self: end;
+  font-size: 0.86rem;
+}
 .auth-password-control {
   position: relative;
   margin-top: 8px;

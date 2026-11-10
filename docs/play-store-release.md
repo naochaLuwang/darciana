@@ -1,5 +1,7 @@
 # Daciana — first Google Play release
 
+This is the initial 1.0.0 release checklist snapshot. Google Play testing is now in use; see [Android updates](android-updates.md) for subsequent releases and their upload files. The current source is 1.0.3 / code 4. Do not reuse an accepted version code for another upload.
+
 Prepared 9 November 2026. The signed binary is ready for internal testing. Production publication still depends on the live-service and owner checks below. Nothing has been uploaded to Play Console.
 
 | Item                       | Release                                                             |

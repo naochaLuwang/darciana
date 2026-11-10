@@ -1,6 +1,6 @@
 # Daciana for Android
 
-**Name:** Daciana · **Application ID:** `com.luwangtech.daciana` · **Version:** 1.0.0 (code 1)
+**Name:** Daciana · **Application ID:** `com.luwangtech.daciana` · **Version:** 1.0.3 (code 4)
 
 The Capacitor 8 Android app bundles its customer interface inside the APK. It does not load a hosted website or install a PWA. The existing Next.js website and admin dashboard continue to run separately.
 
@@ -55,6 +55,10 @@ Set **Site URL** to `https://dacianastore.in` and also allow `https://dacianasto
 For a browser-only mobile preview that uses the real project, also allow `http://127.0.0.1:5173/auth/callback`. The production Android app always uses the custom scheme above. Keep Google provider credentials in Supabase, not in the native project. See [Supabase mobile deep linking](https://supabase.com/docs/guides/auth/native-mobile-deep-linking) and the [Google setup guide](google-sign-in.md).
 
 Sign-up email confirmation uses the same app link and the verifier saved on the originating device. Confirm from that device. A callback without a matching, unexpired flow cannot establish a session. Customers signing in from checkout return to checkout with their bag intact.
+
+## Password recovery
+
+Password recovery is available from **Sign in → Forgot password?**. Supabase sends the reset through the configured Resend SMTP service and returns to the existing native callback. Open the link on the requesting device. After setting a new password, sign in again. See [Resend setup](resend-email.md) for hosted SMTP configuration and order emails; those credentials stay on the server.
 
 ## Account deletion
 

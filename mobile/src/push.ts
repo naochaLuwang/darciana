@@ -1,7 +1,8 @@
 import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { z } from 'zod';
-import { notificationPath } from '@/lib/push';
+import { notificationPath, adminOrderPath } from '@/lib/push';
 import { supabase } from './supabase';
 import { authStorage } from './storage';
 import { navigateApp, notify } from './navigation';
@@ -68,10 +69,10 @@ async function deviceRequest(
   token?: string,
 ) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (method === 'POST') {
+  if (method === 'POST' && preferences.owner) {
     const { data } = await supabase.auth.getSession();
     if (!data.session || data.session.user.id !== preferences.owner)
-      throw new Error('Sign in to enable notifications.');
+      throw new Error('Sign in again to link account notifications.');
     headers.Authorization = `Bearer ${data.session.access_token}`;
   }
   const base = import.meta.env.VITE_API_URL || 'https://dacianastore.in';
@@ -109,11 +110,30 @@ async function ensureListeners() {
         ),
       ),
     );
-    await PushNotifications.addListener('pushNotificationActionPerformed', ({ notification }) => {
-      const path = notificationPath(notification.data?.path);
-      refreshScreens();
-      navigateApp(path ?? '/account');
-    });
+    await PushNotifications.addListener(
+      'pushNotificationActionPerformed',
+      async ({ notification }) => {
+        if (notification.data?.kind === 'admin_order') {
+          const path = adminOrderPath(notification.data.order_id);
+          if (!path) return;
+          try {
+            const { data, error } = await supabase.rpc('storefront_is_admin');
+            if (error || data !== true) {
+              navigateApp('/account');
+              return;
+            }
+            await Browser.open({ url: new URL(path, 'https://dacianastore.in').href });
+          } catch {
+            notify('Reconnect to open this order.');
+            navigateApp('/account');
+          }
+          return;
+        }
+        const path = notificationPath(notification.data?.path);
+        refreshScreens();
+        navigateApp(path ?? '/account');
+      },
+    );
     await PushNotifications.addListener('pushNotificationReceived', () => {
       refreshScreens();
     });
@@ -123,6 +143,13 @@ async function ensureListeners() {
       importance: 4,
       visibility: 0,
       description: 'Updates about your orders',
+    });
+    await PushNotifications.createChannel({
+      id: 'admin_orders',
+      name: 'New orders',
+      importance: 4,
+      visibility: 0,
+      description: 'New customer orders for store admins',
     });
     await PushNotifications.createChannel({
       id: 'announcements',
@@ -181,20 +208,37 @@ export function disablePush() {
     if (supported()) await disable(await getPushPreferences());
   });
 }
+export function detachPushAccount() {
+  return serial(async () => {
+    if (!supported()) return;
+    const preferences = await getPushPreferences();
+    if (!preferences.owner) return;
+    // Invalidate the old private token before retaining the guest opt-in. A
+    // failed revocation stays pending and is retried after reconnection.
+    try {
+      await disable(preferences);
+    } finally {
+      const current = await getPushPreferences();
+      await save({ ...current, enabled: preferences.enabled, owner: null });
+    }
+  });
+}
 export function enablePush(announcements: boolean) {
   return serial(async () => {
     if (!supported()) throw new Error('Push notifications are available in the Android app.');
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-    if (error || !user) throw new Error('Sign in to enable notifications.');
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw new Error('Could not read notification preferences. Please try again.');
     let permission = await PushNotifications.checkPermissions();
     if (permission.receive !== 'granted') permission = await PushNotifications.requestPermissions();
     if (permission.receive !== 'granted')
       throw new Error('Allow notifications in Android Settings → Apps → Daciana → Notifications.');
     const preferences = await getPushPreferences();
-    const next = { ...preferences, enabled: true, announcements, owner: user.id };
+    const next = {
+      ...preferences,
+      enabled: true,
+      announcements,
+      owner: data.session?.user.id ?? null,
+    };
     try {
       await register(next);
       await save({ ...next, registered: true });
@@ -211,15 +255,22 @@ export function restorePush(userId: string | null) {
     if (!supported()) return;
     await ensureListeners();
     const preferences = await getPushPreferences();
-    if (!preferences.enabled || preferences.owner !== userId || !userId) {
-      if (preferences.enabled || preferences.registered) await disable(preferences);
+    if (!preferences.enabled) {
+      if (preferences.registered) await disable(preferences);
       return;
     }
     if ((await PushNotifications.checkPermissions()).receive !== 'granted') {
       await disable(preferences);
       return;
     }
-    await register(preferences);
+    let next = preferences;
+    if (preferences.owner !== userId) {
+      if (preferences.owner) await disable(preferences).catch(() => {});
+      next = { ...(await getPushPreferences()), enabled: true, owner: userId };
+      await save(next);
+    }
+    await register(next);
+    await save({ ...next, registered: true });
   }).catch(() => {
     /* Retry on the next app resume or network reconnection. */
   });

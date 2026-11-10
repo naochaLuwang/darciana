@@ -6,11 +6,12 @@ import { authStorage } from './storage';
 import { supabase, authStorageKey } from './supabase';
 import { clearPrivateScreens, refreshScreens } from './query';
 import { navigateApp, notify } from './navigation';
-import { disablePush } from './push';
+import { disablePush, detachPushAccount } from './push';
+import { recoveryGrant, recoveryStorageKey } from '@/lib/password-recovery';
 
 const flowKey = 'daciana.oauth-flow.v1';
 const flowSchema = z.object({
-  kind: z.enum(['login', 'signup', 'delete']),
+  kind: z.enum(['login', 'signup', 'delete', 'recovery']),
   destination: z.enum(['account', 'checkout']),
   expires: z.number(),
   userId: z.string().optional(),
@@ -25,7 +26,7 @@ export function authRedirectUrl() {
 }
 
 export async function rememberAuthFlow(
-  kind: 'login' | 'signup' | 'delete',
+  kind: 'login' | 'signup' | 'delete' | 'recovery',
   next: string,
   userId?: string,
 ) {
@@ -34,7 +35,7 @@ export async function rememberAuthFlow(
     JSON.stringify({
       kind,
       destination: next === 'checkout' ? 'checkout' : 'account',
-      expires: Date.now() + (kind === 'signup' ? 3_600_000 : 600_000),
+      expires: Date.now() + (kind === 'signup' || kind === 'recovery' ? 3_600_000 : 600_000),
       userId,
     }),
   );
@@ -60,12 +61,13 @@ export async function beginGoogleSignIn(next: string, deleteUserId?: string) {
   }
 }
 
-export async function clearLocalSession() {
-  await disablePush().catch(() => {});
+export async function clearLocalSession(accountDeleted = false) {
+  await (accountDeleted ? disablePush() : detachPushAccount()).catch(() => {});
   supabase.auth.stopAutoRefresh();
   await authStorage.removeItem(authStorageKey);
   await authStorage.removeItem(`${authStorageKey}-code-verifier`);
   await authStorage.removeItem(flowKey);
+  await authStorage.removeItem(recoveryStorageKey);
   clearPrivateScreens();
   window.dispatchEvent(new Event('daciana:signed-out'));
 }
@@ -106,13 +108,30 @@ export async function completeAuthCallback(raw: string) {
         return;
       }
       // The SDK validates the code against the verifier in encrypted storage.
-      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      let recovering = false;
+      const { data: listener } = supabase.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY') recovering = true;
+      });
+      const result = await supabase.auth
+        .exchangeCodeForSession(code)
+        .finally(() => listener.subscription.unsubscribe());
+      const { data, error } = result;
       if (error || !data.user) {
         navigateApp('/account?error=oauth', true);
         return;
       }
       completed.add(code);
       if (completed.size > 20) completed.delete(completed.values().next().value!);
+      if (flow.data.kind === 'recovery') {
+        if (!recovering) {
+          navigateApp('/account/forgot-password', true);
+          return;
+        }
+        await authStorage.setItem(recoveryStorageKey, recoveryGrant(data.user.id));
+        navigateApp('/account/reset-password', true);
+        return;
+      }
+      await authStorage.removeItem(recoveryStorageKey);
       if (flow.data.kind === 'delete') {
         if (data.user.id !== flow.data.userId) {
           notify('A different Google account was selected. No account was deleted.');
@@ -127,7 +146,7 @@ export async function completeAuthCallback(raw: string) {
           navigateApp('/account', true);
           return;
         }
-        await clearLocalSession();
+        await clearLocalSession(true);
         localStorage.removeItem('darciana.bag.v1');
         localStorage.removeItem('darciana.saved.v1');
         window.dispatchEvent(new Event('darciana-storage'));

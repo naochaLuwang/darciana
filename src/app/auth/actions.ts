@@ -4,6 +4,12 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { oauthDestinationCookie } from '@/lib/auth-navigation';
+import {
+  requestPasswordReset,
+  applyNewPassword,
+  readRecoveryGrant,
+  recoveryCookie,
+} from '@/lib/password-recovery';
 export type AuthState = { error?: string; message?: string };
 export async function signInWithGoogle(_: AuthState, form: FormData): Promise<AuthState> {
   const supabase = await createClient();
@@ -81,4 +87,33 @@ export async function signOut() {
   const supabase = await createClient();
   if (supabase) await supabase.auth.signOut();
   redirect('/account');
+}
+
+export async function forgotPassword(_: AuthState, form: FormData): Promise<AuthState> {
+  const origin = (await headers()).get('origin');
+  if (!origin || !/^https?:\/\//.test(origin)) return { error: 'Refresh the page and try again.' };
+  return requestPasswordReset(
+    await createClient(),
+    form.get('email'),
+    new URL('/auth/callback', origin).href,
+  );
+}
+
+export async function updatePassword(_: AuthState, form: FormData): Promise<AuthState> {
+  const db = await createClient();
+  const cookieStore = await cookies();
+  try {
+    const result = await applyNewPassword(
+      db,
+      { password: form.get('password'), confirmation: form.get('confirmation') },
+      readRecoveryGrant(cookieStore.get(recoveryCookie)?.value),
+    );
+    if (result.error) return result;
+    cookieStore.delete(recoveryCookie);
+    await db!.auth.signOut({ scope: 'global' });
+    await db!.auth.signOut({ scope: 'local' });
+  } catch {
+    return { error: 'Could not update your password. Reconnect and try again.' };
+  }
+  redirect('/account?password=updated');
 }

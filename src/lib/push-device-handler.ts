@@ -40,14 +40,20 @@ export async function handlePushDevice(request: Request, db: SupabaseClient | nu
     input,
   );
   if (!parsed.success) return reply({ error: 'Invalid device registration.' }, 400);
-  let userId: string | undefined;
+  let userId: string | null = null;
   if (request.method === 'POST') {
-    const accessToken = request.headers.get('authorization')?.match(/^Bearer (\S+)$/)?.[1];
-    if (!accessToken || accessToken.length > 8192)
-      return reply({ error: 'Sign in to enable notifications.' }, 401);
-    const { data, error } = await db.auth.getUser(accessToken);
-    if (error || !data.user) return reply({ error: 'Sign in to enable notifications.' }, 401);
-    userId = data.user.id;
+    const authorization = request.headers.get('authorization');
+    // An absent session registers a guest installation. An invalid supplied
+    // session must fail instead of silently changing an account into a guest.
+    if (authorization) {
+      const accessToken = authorization.match(/^Bearer (\S+)$/)?.[1];
+      if (!accessToken || accessToken.length > 8192)
+        return reply({ error: 'Sign in again to link account notifications.' }, 401);
+      const { data, error } = await db.auth.getUser(accessToken);
+      if (error || !data.user)
+        return reply({ error: 'Sign in again to link account notifications.' }, 401);
+      userId = data.user.id;
+    }
   }
   const { id, secret } = parsed.data;
   const { data: existing, error } = await db
@@ -71,17 +77,28 @@ export async function handlePushDevice(request: Request, db: SupabaseClient | nu
     return reply({ removed: true });
   }
   const registration = registrationSchema.parse(input);
-  const result = await db.from('storefront_push_devices').upsert(
-    {
-      id,
-      secret_hash: hashInstallationSecret(secret),
-      user_id: userId,
-      token: registration.token,
-      announcements: registration.announcements,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'id' },
-  );
+  const row = {
+    id,
+    secret_hash: hashInstallationSecret(secret),
+    user_id: userId,
+    token: registration.token,
+    announcements: registration.announcements,
+    updated_at: new Date().toISOString(),
+  };
+  // Compare installation proof inside the write too. A concurrent first insert
+  // must never let another caller overwrite a registration after a stale read.
+  const result = existing
+    ? await db
+        .from('storefront_push_devices')
+        .update(row)
+        .eq('id', id)
+        .eq('secret_hash', hashInstallationSecret(secret))
+        .select('id')
+        .maybeSingle()
+    : await db.from('storefront_push_devices').insert(row).select('id').single();
+  if (result.error?.code === '23505')
+    return reply({ error: 'This device registration changed. Please try again.' }, 409);
   if (result.error) return reply({ error: pushError(result.error) }, 503);
+  if (!result.data) return reply({ error: 'Device verification failed.' }, 403);
   return reply({ registered: true });
 }

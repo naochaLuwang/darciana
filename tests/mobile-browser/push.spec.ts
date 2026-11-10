@@ -3,10 +3,15 @@ import { test, expect } from '@playwright/test';
 declare global {
   interface Window {
     pushFixture: {
-      metrics: { prompts: number; registrations: number; unregistrations: number };
+      metrics: {
+        prompts: number;
+        registrations: number;
+        unregistrations: number;
+        openedUrls: string[];
+      };
       grant: () => void;
       deny: () => void;
-      tap: (path: string) => void;
+      tap: (path: string, kind?: string, orderId?: string) => void;
     };
   }
 }
@@ -23,9 +28,14 @@ test.beforeEach(async ({ page, request }) => {
       pushFixture: Window['pushFixture'];
     };
     const callbacks = new Map<string, (value: unknown) => void>();
-    let permission = 'prompt';
+    let permission = localStorage.getItem('fixture-push-permission') || 'prompt';
     let sequence = 0;
-    const metrics = { prompts: 0, registrations: 0, unregistrations: 0 };
+    const metrics = {
+      prompts: 0,
+      registrations: 0,
+      unregistrations: 0,
+      openedUrls: [] as string[],
+    };
     bridge.CapacitorCustomPlatform = { name: 'android' };
     const methods: Record<string, string[]> = {
       PushNotifications: [
@@ -42,6 +52,7 @@ test.beforeEach(async ({ page, request }) => {
       SystemBars: ['setStyle'],
       SplashScreen: ['hide'],
       Keyboard: ['hide'],
+      Browser: ['open', 'close'],
     };
     bridge.Capacitor = {
       PluginHeaders: Object.entries(methods).map(([name, names]) => ({
@@ -62,6 +73,7 @@ test.beforeEach(async ({ page, request }) => {
         return String(++sequence);
       },
       async nativePromise(plugin: string, method: string, options: Record<string, unknown> = {}) {
+        if (plugin === 'Browser' && method === 'open') metrics.openedUrls.push(String(options.url));
         if (plugin === 'SecureStorage') {
           if (method === 'internalGetItem')
             return { data: localStorage.getItem(String(options.prefixedKey)) };
@@ -99,19 +111,23 @@ test.beforeEach(async ({ page, request }) => {
       metrics,
       grant: () => {
         permission = 'granted';
+        localStorage.setItem('fixture-push-permission', permission);
       },
       deny: () => {
         permission = 'denied';
+        localStorage.setItem('fixture-push-permission', permission);
       },
-      tap: (path: string) =>
+      tap: (path: string, kind?: string, orderId?: string) =>
         callbacks.get('PushNotifications:pushNotificationActionPerformed')?.({
-          notification: { data: { path } },
+          notification: { data: { path, kind, order_id: orderId } },
         }),
     };
   });
 });
 
-test('native notification opt-in, consent, tap routing and logout cleanup', async ({ page }) => {
+test('guests can opt in and notifications attach on login, detach on logout and persist as guest consent', async ({
+  page,
+}) => {
   const requests: { method: string; body: Record<string, unknown>; bearer: string | undefined }[] =
     [];
   await page.route('https://dacianastore.in/api/push/devices', async (route) => {
@@ -138,15 +154,8 @@ test('native notification opt-in, consent, tap routing and logout cleanup', asyn
       body: JSON.stringify({ registered: true, removed: true }),
     });
   });
-  await page.goto('/#/account');
-  await page.getByLabel('Email address', { exact: true }).fill('customer@example.com');
-  await page.getByLabel('Password', { exact: true }).fill('test-password');
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'My account', exact: true })).toBeVisible();
-  await page
-    .getByRole('navigation', { name: 'App navigation' })
-    .getByRole('link', { name: 'More', exact: true })
-    .click();
+  await page.goto('/#/more');
+  await expect(page.getByRole('link', { name: 'Sign in to enable notifications' })).toHaveCount(0);
   const push = page.getByRole('switch', { name: /Push notifications/ });
   await expect(push).not.toBeChecked();
   expect(await page.evaluate(() => window.pushFixture.metrics.prompts)).toBe(0);
@@ -158,10 +167,23 @@ test('native notification opt-in, consent, tap routing and logout cleanup', asyn
   await push.click();
   await expect(page.getByText('Notifications enabled.', { exact: true })).toBeVisible();
   expect(requests.at(-1)?.body.announcements).toBe(false);
-  expect(requests.at(-1)?.bearer).toMatch(/^Bearer /);
+  expect(requests.at(-1)?.bearer).toBeUndefined();
   await page.getByRole('switch', { name: /Store announcements/ }).click();
   await expect(page.getByText('Notifications enabled.', { exact: true })).toBeVisible();
   expect(requests.at(-1)?.body.announcements).toBe(true);
+  await page.reload();
+  await expect(push).toBeChecked();
+  await expect(page.getByRole('switch', { name: /Store announcements/ })).toBeChecked();
+  await page.goto('/#/account');
+  await page.getByLabel('Email address', { exact: true }).fill('customer@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('test-password');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'My account', exact: true })).toBeVisible();
+  await expect
+    .poll(() => requests.filter((request) => request.method === 'POST').at(-1)?.bearer)
+    .toMatch(/^Bearer /);
+  await page.goto('/#/more');
+  await expect(push).toBeChecked();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/push-settings.png', fullPage: true });
   await page.evaluate(() => window.pushFixture.tap('/shop'));
@@ -172,4 +194,91 @@ test('native notification opt-in, consent, tap routing and logout cleanup', asyn
   await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
   expect(requests.some((request) => request.method === 'DELETE')).toBe(true);
   expect(await page.evaluate(() => window.pushFixture.metrics.unregistrations)).toBeGreaterThan(0);
+  await expect
+    .poll(
+      () =>
+        requests
+          .slice(requests.findLastIndex((request) => request.method === 'DELETE') + 1)
+          .filter((request) => request.method === 'POST').length,
+    )
+    .toBeGreaterThan(0);
+  expect(requests.filter((request) => request.method === 'POST').at(-1)?.bearer).toBeUndefined();
+  expect(requests.filter((request) => request.method === 'POST').at(-1)?.body.announcements).toBe(
+    true,
+  );
+  await page.goto('/#/more');
+  await expect(push).toBeChecked();
+  await push.click();
+  await expect(page.getByText('Notifications turned off.', { exact: true })).toBeVisible();
+  await expect(push).not.toBeChecked();
+});
+
+test('admin order taps open only the fixed order dashboard URL for an enrolled admin', async ({
+  page,
+}) => {
+  await page.route('https://dacianastore.in/api/push/devices', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: '{"registered":true,"removed":true}',
+    }),
+  );
+  await page.goto('/#/account');
+  await page.getByLabel('Email address', { exact: true }).fill('owner@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('test-password');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'My account', exact: true })).toBeVisible();
+  await page.goto('/#/more');
+  await page.evaluate(() => window.pushFixture.grant());
+  await page.getByRole('switch', { name: /Push notifications/ }).click();
+  await expect(page.getByText('Notifications enabled.', { exact: true })).toBeVisible();
+  const id = '55555555-5555-4555-8555-555555555555';
+  await page.evaluate((orderId) => window.pushFixture.tap('/admin', 'admin_order', orderId), id);
+  await expect
+    .poll(() => page.evaluate(() => window.pushFixture.metrics.openedUrls))
+    .toEqual([`https://dacianastore.in/admin/orders/${id}`]);
+  await page.evaluate(() => window.pushFixture.tap('/admin', 'admin_order', 'https://evil.test'));
+  expect(await page.evaluate(() => window.pushFixture.metrics.openedUrls)).toHaveLength(1);
+});
+
+test('account deletion disables notifications and a customer cannot open an admin notification', async ({
+  page,
+}) => {
+  const requests: string[] = [];
+  await page.route('https://dacianastore.in/api/push/devices', (route) => {
+    requests.push(route.request().method());
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: '{"registered":true,"removed":true}',
+    });
+  });
+  await page.goto('/#/account');
+  await page.getByLabel('Email address', { exact: true }).fill('customer@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('test-password');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'My account', exact: true })).toBeVisible();
+  await page.goto('/#/more');
+  await page.evaluate(() => window.pushFixture.grant());
+  await page.getByRole('switch', { name: /Push notifications/ }).click();
+  await expect(page.getByText('Notifications enabled.', { exact: true })).toBeVisible();
+  await page.evaluate(() =>
+    window.pushFixture.tap('/admin', 'admin_order', '55555555-5555-4555-8555-555555555555'),
+  );
+  await expect(page).toHaveURL(/#\/account$/);
+  expect(await page.evaluate(() => window.pushFixture.metrics.openedUrls)).toHaveLength(0);
+  await page.getByRole('button', { name: 'Delete account', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Password', { exact: true }).fill('test-password');
+  await dialog.getByLabel('Type DELETE to confirm').fill('DELETE');
+  await dialog.getByRole('button', { name: 'Delete my account', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
+  await page.goto('/#/more');
+  await expect(page.getByRole('switch', { name: /Push notifications/ })).not.toBeChecked();
+  expect(requests).toContain('DELETE');
+  expect(await page.evaluate(() => window.pushFixture.metrics.unregistrations)).toBeGreaterThan(0);
+  await page.reload();
+  await expect(page.getByRole('switch', { name: /Push notifications/ })).not.toBeChecked();
 });

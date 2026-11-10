@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+export function adminOrderPath(orderId: unknown): string | null {
+  return z.uuid().safeParse(orderId).success ? `/admin/orders/${orderId}` : null;
+}
+
 // Notification destinations are app routes, never arbitrary links or admin pages.
 export function notificationPath(value: unknown): string | null {
   if (typeof value !== 'string' || value.length > 700) return null;
@@ -38,7 +42,7 @@ export function orderPush(status: string) {
     : null;
 }
 export function pushError(error: { code?: string } | null) {
-  return ['42P01', 'PGRST205', '42501'].includes(error?.code ?? '')
+  return ['42P01', 'PGRST205', '42501', '23502'].includes(error?.code ?? '')
     ? 'Run supabase/push-setup.sql in the Supabase SQL Editor first.'
     : 'Notifications are unavailable. Please try again.';
 }

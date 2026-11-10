@@ -15,7 +15,13 @@ export const dynamic = 'force-dynamic';
 export default async function Account({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; confirmed?: string; error?: string; deleted?: string }>;
+  searchParams: Promise<{
+    next?: string;
+    confirmed?: string;
+    error?: string;
+    deleted?: string;
+    password?: string;
+  }>;
 }) {
   const [supabase, params] = await Promise.all([createClient(), searchParams]);
   const user = supabase ? (await supabase.auth.getUser()).data.user : null;
@@ -23,6 +29,11 @@ export default async function Account({
     return (
       <main id="main" className="page-width auth-page">
         <div>
+          {params.password === 'updated' ? (
+            <p className="form-success" role="status">
+              Password updated. Sign in with your new password.
+            </p>
+          ) : null}
           {params.deleted ? (
             <p className="form-success" role="status">
               Account deleted.

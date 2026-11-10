@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Bell } from 'lucide-react';
-import Link from 'next/link';
 import { useSession } from './session';
 import { disablePush, enablePush, getPushPreferences } from './push';
 
@@ -18,7 +17,7 @@ export function PushSettings() {
       void getPushPreferences()
         .then((value) => {
           if (!disposed) {
-            setEnabled(value.enabled && value.owner === user?.id);
+            setEnabled(value.enabled);
             setAnnouncements(value.announcements);
           }
         })
@@ -54,44 +53,40 @@ export function PushSettings() {
         <Bell size={19} aria-hidden="true" />
         <h3 id="push-settings-title">Notifications</h3>
       </div>
-      {user ? (
-        <>
-          <label className="push-setting-row">
-            <span>
-              <strong>Push notifications</strong>
-              <small>Order updates on this device</small>
-            </span>
-            <input
-              type="checkbox"
-              role="switch"
-              checked={enabled}
-              onChange={(event) => {
-                void change(event.target.checked, announcements);
-              }}
-              disabled={pending}
-            />
-          </label>
-          <label className="push-setting-row">
-            <span>
-              <strong>Store announcements</strong>
-              <small>Offers, new arrivals and news</small>
-            </span>
-            <input
-              type="checkbox"
-              role="switch"
-              checked={enabled && announcements}
-              onChange={(event) => {
-                void change(true, event.target.checked);
-              }}
-              disabled={pending || !enabled}
-            />
-          </label>
-        </>
-      ) : (
-        <Link href="/account" className="text-link">
-          Sign in to enable notifications
-        </Link>
-      )}
+      <>
+        <label className="push-setting-row">
+          <span>
+            <strong>Push notifications</strong>
+            <small>
+              {user ? 'Order updates on this device' : 'Allow notifications on this device'}
+            </small>
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            checked={enabled}
+            onChange={(event) => {
+              void change(event.target.checked, announcements);
+            }}
+            disabled={pending}
+          />
+        </label>
+        <label className="push-setting-row">
+          <span>
+            <strong>Store announcements</strong>
+            <small>Offers, new arrivals and news</small>
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            checked={enabled && announcements}
+            onChange={(event) => {
+              void change(true, event.target.checked);
+            }}
+            disabled={pending || !enabled}
+          />
+        </label>
+      </>
       {pending ? (
         <p className="push-setting-feedback" role="status">
           Updating…

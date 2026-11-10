@@ -2,6 +2,7 @@
 import { useActionState } from 'react';
 import { LockKeyhole, ArrowRight } from 'lucide-react';
 import { adminSignIn, type AdminResult } from '@/app/admin/actions';
+import Link from 'next/link';
 export function AdminLogin() {
   const [state, action, pending] = useActionState<AdminResult, FormData>(adminSignIn, {});
   return (
@@ -26,6 +27,9 @@ export function AdminLogin() {
           maxLength={128}
         />
       </label>
+      <Link href="/account/forgot-password" className="text-link auth-forgot">
+        Forgot password?
+      </Link>
       {state.error ? (
         <p role="alert" className="form-error">
           {state.error}

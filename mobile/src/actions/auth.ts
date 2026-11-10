@@ -8,6 +8,13 @@ import {
 } from '../auth-flow';
 import { navigateApp } from '../navigation';
 import { isDeviceOnline } from '../network';
+import {
+  requestPasswordReset,
+  applyNewPassword,
+  readRecoveryGrant,
+  recoveryStorageKey,
+} from '@/lib/password-recovery';
+import { authStorage } from '../storage';
 
 export type AuthState = { error?: string; message?: string };
 const credentials = z.object({ email: z.email().max(254), password: z.string().min(1).max(128) });
@@ -58,5 +65,30 @@ export async function signOut() {
   } finally {
     await clearLocalSession();
     navigateApp('/account', true);
+  }
+}
+
+export async function forgotPassword(_: AuthState, form: FormData): Promise<AuthState> {
+  if (!isDeviceOnline()) return { error: 'Reconnect to request a reset link.' };
+  await rememberAuthFlow('recovery', 'account');
+  return requestPasswordReset(supabase, form.get('email'), authRedirectUrl());
+}
+
+export async function updatePassword(_: AuthState, form: FormData): Promise<AuthState> {
+  if (!isDeviceOnline()) return { error: 'Reconnect to update your password.' };
+  try {
+    const result = await applyNewPassword(
+      supabase,
+      { password: form.get('password'), confirmation: form.get('confirmation') },
+      readRecoveryGrant(await authStorage.getItem(recoveryStorageKey)),
+    );
+    if (result.error) return result;
+    await supabase.auth.signOut({ scope: 'global' });
+    await supabase.auth.signOut({ scope: 'local' });
+    await clearLocalSession();
+    navigateApp('/account?password=updated', true);
+    return {};
+  } catch {
+    return { error: 'Could not update your password. Reconnect and try again.' };
   }
 }

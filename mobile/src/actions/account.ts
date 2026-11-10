@@ -16,6 +16,6 @@ export async function saveProfile(input: unknown) {
 export async function deleteAccount(input: unknown) {
   if (!isDeviceOnline()) return { error: 'Reconnect to delete your account.' };
   const result = await actions.deleteAccount(input);
-  if (result.deleted) await clearLocalSession();
+  if (result.deleted) await clearLocalSession(true);
   return result;
 }

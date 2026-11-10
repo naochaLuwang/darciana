@@ -36,6 +36,8 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     deletedUsers,
     siteSettings,
     oauthChallenges,
+    recoveryLink,
+    passwords,
     oauthDenied,
     galleryUnavailable,
     storageObjects;
@@ -43,6 +45,11 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
   function reset() {
     storageObjects = new Map();
     oauthChallenges = new Map();
+    recoveryLink = null;
+    passwords = new Map([
+      [CUSTOMER, 'test-password'],
+      [OWNER, 'test-password'],
+    ]);
     oauthDenied = false;
     galleryUnavailable = false;
     siteSettings = [
@@ -180,6 +187,7 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     const path = url.pathname;
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
     const reply = (status, data) => {
       res.writeHead(status, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(data));
@@ -287,6 +295,7 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
       oauthDenied = true;
       return reply(200, {});
     }
+    if (path === '/__recovery/last') return reply(200, { url: recoveryLink });
     if (path === '/auth/v1/authorize') {
       const redirect = url.searchParams.get('redirect_to');
       if (
@@ -321,7 +330,7 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
       if ([OWNER, CUSTOMER].includes(payload.sub) && !deletedUsers.has(payload.sub))
         user = userFor(payload.sub);
     } catch {}
-    if (path === '/auth/v1/user')
+    if (path === '/auth/v1/user' && req.method === 'GET')
       return user ? reply(200, user) : reply(401, { message: 'Invalid token' });
     const chunks = [];
     for await (const chunk of req) chunks.push(Buffer.from(chunk));
@@ -331,6 +340,29 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     try {
       args = JSON.parse(raw || '{}');
     } catch {}
+    if (path === '/auth/v1/recover') {
+      const redirect = new URL(url.searchParams.get('redirect_to'));
+      if (
+        !['http://127.0.0.1:3002/auth/callback', 'http://127.0.0.1:5174/auth/callback'].includes(
+          `${redirect.origin}${redirect.pathname}`,
+        )
+      )
+        return reply(400, { message: 'Invalid recovery callback' });
+      if (args.email === 'customer@example.com') {
+        const code = randomUUID();
+        oauthChallenges.set(code, args.code_challenge);
+        redirect.searchParams.set('code', code);
+        recoveryLink = redirect.href;
+      }
+      return reply(200, {});
+    }
+    if (path === '/auth/v1/user' && req.method === 'PUT') {
+      if (!user) return reply(401, { message: 'Invalid token' });
+      if (typeof args.password !== 'string' || args.password.length < 8)
+        return reply(400, { message: 'Invalid password' });
+      passwords.set(user.id, args.password);
+      return reply(200, user);
+    }
     if (path.startsWith('/storage/v1/object/public/storefront-media/')) {
       const key = decodeURIComponent(
         path.slice('/storage/v1/object/public/storefront-media/'.length),
@@ -405,6 +437,8 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
         oauthChallenges.delete(args.auth_code);
       }
       const id = args.email === 'owner@example.com' ? OWNER : CUSTOMER;
+      if (url.searchParams.get('grant_type') === 'password' && args.password !== passwords.get(id))
+        return reply(400, { error_code: 'invalid_credentials', message: 'Invalid credentials' });
       return reply(200, {
         access_token: tokenFor(id),
         refresh_token: 'fixture-refresh',

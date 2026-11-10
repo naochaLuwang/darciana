@@ -11,6 +11,8 @@ import { SessionProvider, useSession } from './session';
 import { queryClient } from './query';
 import { RouteNotFound, RouteRedirect } from './navigation';
 import { signOut } from './actions/auth';
+import { PasswordRecovery } from '@/components/password-recovery';
+import { NativeResetPassword } from './password-recovery';
 
 type ScreenName =
   | 'home'
@@ -145,6 +147,8 @@ function Storefront() {
             <Route path="/product/:slug" element={<Screen name="product" />} />
             <Route path="/account" element={<Screen name="account" />} />
             <Route path="/account/addresses" element={<Screen name="addresses" />} />
+            <Route path="/account/forgot-password" element={<PasswordRecovery mode="request" />} />
+            <Route path="/account/reset-password" element={<NativeResetPassword />} />
             <Route
               path="/checkout"
               element={

@@ -2,7 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
-import { announcementSchema, notificationPath, orderPush } from '../src/lib/push.ts';
+import {
+  announcementSchema,
+  notificationPath,
+  orderPush,
+  adminOrderPath,
+} from '../src/lib/push.ts';
 import { handlePushDevice, hashInstallationSecret } from '../src/lib/push-device-handler.ts';
 import { deliverPush } from '../src/lib/push-delivery.ts';
 
@@ -64,11 +69,28 @@ test('device registration validates the caller and requires installation proof f
         select: () => ({
           eq: () => ({ maybeSingle: async () => ({ data: existing, error: null }) }),
         }),
-        upsert: async (row) => {
-          writes.push(row);
-          existing = { secret_hash: row.secret_hash };
-          return { error: null };
-        },
+        insert: (row) => ({
+          select: () => ({
+            single: async () => {
+              writes.push(row);
+              existing = { secret_hash: row.secret_hash };
+              return { data: { id: row.id }, error: null };
+            },
+          }),
+        }),
+        update: (row) => ({
+          eq: () => ({
+            eq: () => ({
+              select: () => ({
+                maybeSingle: async () => {
+                  writes.push(row);
+                  existing = { secret_hash: row.secret_hash };
+                  return { data: { id: row.id }, error: null };
+                },
+              }),
+            }),
+          }),
+        }),
         delete: () => ({
           eq: (_, id) => ({
             eq: async (_, hash) => {
@@ -108,6 +130,14 @@ test('device registration validates the caller and requires installation proof f
   assert.equal(writes[0].user_id, customer, 'client cannot choose the recipient account');
   assert.equal(writes[0].secret_hash, hashInstallationSecret(installation.secret));
   assert.notEqual(writes[0].secret_hash, installation.secret);
+  const guest = new Request('https://dacianastore.in/api/push/devices', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: 'https://localhost' },
+    body: JSON.stringify({ ...installation, user_id: customer, announcements: true }),
+  });
+  assert.equal((await handlePushDevice(guest, db)).status, 200);
+  assert.equal(writes.at(-1).user_id, null, 'guest registration cannot claim a customer account');
+  assert.equal(writes.at(-1).announcements, true);
   assert.equal(
     (await handlePushDevice(request('POST', { ...installation, secret: 'b'.repeat(64) }), db))
       .status,
@@ -181,10 +211,23 @@ test('push tables deny direct customer reads and writes, cascade device cleanup 
   }
 });
 
-function deliveryFixture(devices) {
+function deliveryFixture(devices, adminIds = []) {
   const logs = [];
   const deletedTokens = [];
   const db = {
+    rpc: async (name, args) => {
+      assert.equal(name, 'storefront_admin_push_devices');
+      return {
+        data: devices
+          .filter(
+            (device) =>
+              adminIds.includes(device.user_id) && (!args.p_after || device.id > args.p_after),
+          )
+          .sort((a, b) => a.id.localeCompare(b.id))
+          .slice(0, args.p_limit),
+        error: null,
+      };
+    },
     from: (table) => {
       if (table === 'storefront_push_deliveries')
         return {
@@ -285,6 +328,46 @@ test('sending respects announcement opt-in, batches at 500, prunes only expired 
   assert.equal(fixture.logs[0].status, 'partial');
   assert.ok((await deliverPush(draft, fixture.db, messaging)).error);
   assert.equal(batches.length, 2);
+});
+
+test('new order alerts target verified admin devices, regardless of announcement preference, and deduplicate events', async () => {
+  const admin = '22222222-2222-4222-8222-222222222222';
+  const orderId = '33333333-3333-4333-8333-333333333333';
+  const fixture = deliveryFixture(
+    [
+      { id: '1', token: 'guest', user_id: null, announcements: true },
+      { id: '2', token: 'customer', user_id: customer, announcements: true },
+      { id: '3', token: 'admin', user_id: admin, announcements: false },
+    ],
+    [admin],
+  );
+  const batches = [];
+  const messaging = {
+    sendEachForMulticast: async (message) => {
+      batches.push(message);
+      return {
+        successCount: message.tokens.length,
+        failureCount: 0,
+        responses: message.tokens.map(() => ({ success: true })),
+      };
+    },
+  };
+  const input = {
+    ...draft,
+    eventKey: `new-order:${orderId}`,
+    actorId: null,
+    audience: 'admin_order',
+    orderId,
+    path: adminOrderPath(orderId),
+  };
+  assert.equal((await deliverPush(input, fixture.db, messaging)).sent, 1);
+  assert.deepEqual(batches[0].tokens, ['admin']);
+  assert.equal(batches[0].data.kind, 'admin_order');
+  assert.equal(batches[0].data.order_id, orderId);
+  assert.equal(batches[0].android.notification.channelId, 'admin_orders');
+  assert.equal((await deliverPush(input, fixture.db, messaging)).duplicate, true);
+  assert.equal(batches.length, 1);
+  assert.equal(adminOrderPath('https://evil.test'), null);
 });
 test('order updates target only the matching customer; empty audiences and FCM failures are recorded', async () => {
   const fixture = deliveryFixture([
