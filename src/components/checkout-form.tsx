@@ -35,7 +35,7 @@ export function CheckoutForm({
   const [addressOpen, setAddressOpen] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [paymentMode, setPaymentMode] = useState<PaymentMode | ''>('');
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash_on_delivery');
   const [areaId, setAreaId] = useState(
     areas.some((area) => area.id === savedAddress?.shipping_area_id)
       ? savedAddress!.shipping_area_id!
