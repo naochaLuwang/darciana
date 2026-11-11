@@ -13,6 +13,7 @@ import { RouteNotFound, RouteRedirect } from './navigation';
 import { signOut } from './actions/auth';
 import { PasswordRecovery } from '@/components/password-recovery';
 import { NativeResetPassword } from './password-recovery';
+import { useDeviceOnline } from './network';
 
 type ScreenName =
   | 'home'
@@ -60,9 +61,10 @@ async function renderScreen(name: ScreenName, slug: string, search: string): Pro
 
 function RetryScreen({ message }: { message?: string }) {
   const { user } = useSession();
+  const online = useDeviceOnline();
   return (
     <main id="main" className="page-width empty-state">
-      <h1>{navigator.onLine ? 'The shop couldn’t load.' : 'You’re offline'}</h1>
+      <h1>{online ? 'The shop couldn’t load.' : 'You’re offline'}</h1>
       <p>{message || 'Reconnect and try again. Your bag is saved on this device.'}</p>
       <button
         type="button"
@@ -90,6 +92,7 @@ function RetryScreen({ message }: { message?: string }) {
 
 function Screen({ name }: { name: ScreenName }) {
   const { user, ready, error: sessionError } = useSession();
+  const online = useDeviceOnline();
   const location = useLocation();
   const params = useParams();
   const navigate = useNavigate();
@@ -113,11 +116,13 @@ function Screen({ name }: { name: ScreenName }) {
   if (screen.error instanceof RouteNotFound) return <NotFound />;
   if (screen.error instanceof RouteRedirect) return <ScreenSkeleton screen={skeleton} />;
   if (screen.isError) return <RetryScreen />;
+  if (!online && screen.data === undefined) return <RetryScreen />;
   if (!ready || screen.isPending) return <ScreenSkeleton screen={skeleton} />;
   return screen.data;
 }
 
 function Storefront() {
+  const online = useDeviceOnline();
   const catalog = useQuery({ queryKey: ['catalog'], queryFn: fetchCatalog });
   return (
     <ShopProvider products={catalog.data?.products ?? []}>
@@ -135,7 +140,9 @@ function Storefront() {
             <Route
               path="/bag"
               element={
-                catalog.isPending ? (
+                catalog.isPending && !online ? (
+                  <RetryScreen />
+                ) : catalog.isPending ? (
                   <ScreenSkeleton screen="bag" />
                 ) : catalog.data?.error ? (
                   <RetryScreen />
@@ -152,7 +159,9 @@ function Storefront() {
             <Route
               path="/checkout"
               element={
-                catalog.isPending ? (
+                catalog.isPending && !online ? (
+                  <RetryScreen />
+                ) : catalog.isPending ? (
                   <ScreenSkeleton screen="checkout" />
                 ) : catalog.data?.error ? (
                   <RetryScreen />

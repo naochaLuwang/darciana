@@ -47,7 +47,10 @@ test('bundled storefront navigation, search and information pages run without a 
   await expect(page.getByRole('heading', { name: /not found|couldn.t find/i })).toBeVisible();
 });
 
-test('profile, address book and COD checkout use the shared database actions', async ({ page }) => {
+test('profile, address book and COD checkout use the shared database actions', async ({
+  page,
+  context,
+}) => {
   await signIn(page);
   await page.getByLabel('Full name', { exact: true }).fill('Native Customer');
   await page.getByLabel('Mobile number', { exact: true }).fill('9876543210');
@@ -67,8 +70,19 @@ test('profile, address book and COD checkout use the shared database actions', a
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('combobox', { name: 'Shipping area', exact: true }).fill('Central');
   await page.getByRole('option', { name: /Central Market/ }).click();
-  await page.getByRole('radio', { name: 'Cash on Delivery (COD)', exact: true }).check();
+  await expect(
+    page.getByRole('radio', { name: 'Cash on Delivery (COD)', exact: true }),
+  ).toBeChecked();
   await page.getByRole('checkbox', { name: 'I accept the terms and conditions' }).check();
+  await context.setOffline(true);
+  await expect(page.locator('.native-offline')).toBeVisible();
+  await order.click();
+  await expect(page.getByRole('alert')).toHaveText(
+    'Reconnect before placing your order. Your bag is saved.',
+  );
+  await expect(page.getByRole('heading', { name: 'Order received', exact: true })).toHaveCount(0);
+  await context.setOffline(false);
+  await expect(page.locator('.native-offline')).toHaveCount(0);
   await order.click();
   await expect(page.getByRole('heading', { name: 'Order received', exact: true })).toBeVisible();
   await expect(page.getByText(/Total ₹349/)).toBeVisible();

@@ -1463,6 +1463,17 @@ body:has(.bag-checkout-dock) .app-content {
   color: var(--muted);
   font-size: 12px;
 }
+.bag-item-info > .bag-stock-status {
+  display: block;
+  width: fit-content;
+  margin: 8px 0 0;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
 .bag-item-info > span:not(.little-label) {
   font-size: 12px;
   font-weight: 600;

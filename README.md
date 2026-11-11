@@ -31,6 +31,7 @@ Tailwind v4 runs through the standard `@tailwindcss/postcss` configuration in `p
 - Product detail pages with variant selection, stock limits, discounts, and INR prices.
 - Search by name or brand, category filters with nested categories, sorting, and in-stock filtering.
 - Favourites and shopping bag saved in browser local storage; quantities and totals use the current catalog rather than saved prices.
+- Bag cards show sold-out, insufficient-stock, or removed-item status individually. Both checkout controls stay disabled until unavailable items are removed or quantities are corrected.
 - Email/password sign-up and sign-in, confirmation callback, cookie session refresh, and sign-out.
 - Google sign-in through Supabase PKCE on web and Android; see the [Google setup walkthrough](docs/google-sign-in.md).
 - India delivery form, validated order requests, confirmation screen, and account order history.
@@ -117,7 +118,9 @@ Page text stays under its existing setting key. Display settings are stored in s
 
 For a new project, run [`supabase/checkout-setup.sql`](supabase/checkout-setup.sql) once after the existing order/admin/shipping/address scripts. Checkout offers **Cash on Delivery (COD)** only, with a cash icon and **Pay in Cash upon delivery** beneath the label. The app also rejects Manual UPI for new submissions. No database update is needed just to remove the option. If the optional Manual UPI SQL upgrade was previously installed, it remains compatible; earlier order payment snapshots and labels are preserved.
 
-Checkout is a compact column: **Shipping info**, tappable **Delivery location**, searchable **Shipping area**, **Price details**, **Select payment mode**, terms checkbox, and **Confirm and order**. The address form and terms open in modal sheets. Confirmation requires an address, an active area, an available bag, COD selection, and accepted terms. Orders remain requests awaiting store confirmation without collecting money or reserving inventory. Idempotent retries return the original saved mode and totals.
+Checkout is a compact column: **Shipping info**, tappable **Delivery location**, searchable **Shipping area**, **Price details**, **Select payment mode**, terms checkbox, and **Confirm and order**. The address form and terms open in modal sheets. COD is selected by default. Confirmation requires an address, an active area, an available bag, and accepted terms. Orders remain requests awaiting store confirmation without collecting money or reserving inventory. Idempotent retries return the original saved mode and totals.
+
+The Android app keeps the bag on the device when offline and blocks order submission. Previously loaded screens may remain available during the session; catalog data and remote images are not persisted for full offline browsing. Screens without cached data show an offline message and retry action instead of a loading skeleton. Reconnection refreshes the catalog and customer screens.
 
 ## Android app with Capacitor
 

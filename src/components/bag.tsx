@@ -5,7 +5,21 @@ import { useShop } from './shop-provider';
 import { ProductImage } from './product-card';
 import { money } from '@/lib/commerce';
 export function Bag() {
-  const { lines, items, total, update } = useShop();
+  const { lines, items, products, total, update } = useShop();
+  const unavailableItems = items.filter(
+    (item) => !lines.some((line) => line.variantId === item.variantId),
+  );
+  const checkoutBlocked =
+    unavailableItems.length > 0 || lines.some((line) => line.quantity > line.variant.stock);
+  const checkoutButton = checkoutBlocked ? (
+    <button type="button" className="button button-dark" disabled>
+      Continue to checkout <ArrowRight size={17} />
+    </button>
+  ) : (
+    <Link href="/checkout" className="button button-dark">
+      Continue to checkout <ArrowRight size={17} />
+    </Link>
+  );
   return (
     <>
       <div className="section-heading">
@@ -14,22 +28,7 @@ export function Bag() {
           Keep shopping <ArrowRight size={17} />
         </Link>
       </div>
-      {items.length > lines.length ? (
-        <div className="notice" role="alert">
-          Some items are no longer available.{' '}
-          <button
-            className="text-link"
-            onClick={() =>
-              items
-                .filter((item) => !lines.some((line) => line.variantId === item.variantId))
-                .forEach((item) => update(item.variantId, 0))
-            }
-          >
-            Remove unavailable items
-          </button>
-        </div>
-      ) : null}
-      {lines.length ? (
+      {items.length ? (
         <>
           <div className="bag-layout">
             <div className="bag-lines">
@@ -48,15 +47,19 @@ export function Bag() {
                     </h2>
                     {line.product.has_variants ? <p>{line.variant.title}</p> : null}
                     <span>{money(line.price)}</span>
-                    {line.quantity > line.variant.stock ? (
-                      <p className="form-error">
-                        Only {line.variant.stock} available. Reduce the quantity or remove this
-                        item.
+                    {line.variant.stock <= 0 ? (
+                      <p className="bag-stock-status" role="status">
+                        Out of stock
+                      </p>
+                    ) : line.quantity > line.variant.stock ? (
+                      <p className="bag-stock-status" role="status">
+                        Only {line.variant.stock} available
                       </p>
                     ) : null}
                     <div className="bag-item-controls">
                       <div className="quantity-control">
                         <button
+                          disabled={line.variant.stock <= 0}
                           aria-label={`Decrease ${line.product.name} quantity`}
                           onClick={() => update(line.variantId, line.quantity - 1)}
                         >
@@ -83,6 +86,32 @@ export function Bag() {
                   </div>
                 </article>
               ))}
+              {unavailableItems.map((item) => {
+                const product = products.find((product) => product.id === item.productId);
+                const name = product?.name ?? 'Unavailable item';
+                return (
+                  <article className="bag-item" key={item.variantId}>
+                    <div className="bag-photo">
+                      <ProductImage src={product?.thumbnail_url ?? null} alt={name} />
+                    </div>
+                    <div className="bag-item-info">
+                      <h2>{name}</h2>
+                      <p className="bag-stock-status" role="status">
+                        No longer available
+                      </p>
+                      <div className="bag-item-controls">
+                        <button
+                          className="remove-item"
+                          aria-label={`Remove ${name}`}
+                          onClick={() => update(item.variantId, 0)}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
             <aside className="order-summary">
               <h2>Order summary</h2>
@@ -94,9 +123,7 @@ export function Bag() {
                 <strong>Subtotal</strong>
                 <strong>{money(total)}</strong>
               </div>
-              <Link href="/checkout" className="button button-dark">
-                Continue to checkout <ArrowRight size={17} />
-              </Link>
+              {checkoutButton}
             </aside>
           </div>
           <div className="bag-checkout-dock">
@@ -104,9 +131,7 @@ export function Bag() {
               <span>Subtotal</span>
               <strong>{money(total)}</strong>
             </div>
-            <Link href="/checkout" className="button button-dark">
-              Continue to checkout <ArrowRight size={17} />
-            </Link>
+            {checkoutButton}
           </div>
         </>
       ) : (
