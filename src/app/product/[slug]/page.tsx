@@ -52,8 +52,8 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             <h2>Related products</h2>
           </div>
           <div className="product-grid">
-            {related.map((item, index) => (
-              <ProductCard key={item.id} product={item} index={index} />
+            {related.map((item) => (
+              <ProductCard key={item.id} product={item} />
             ))}
           </div>
         </section>

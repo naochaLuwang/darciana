@@ -129,7 +129,7 @@ export default async function Home() {
         ) : picks.length ? (
           <div className="product-grid">
             {picks.slice(0, 4).map((product, index) => (
-              <ProductCard key={product.id} product={product} index={index} eager={index < 4} />
+              <ProductCard key={product.id} product={product} eager={index < 4} />
             ))}
           </div>
         ) : (
@@ -193,8 +193,8 @@ export default async function Home() {
             </Link>
           </div>
           <div className="product-grid">
-            {picks.slice(4).map((product, index) => (
-              <ProductCard key={product.id} product={product} index={index} />
+            {picks.slice(4).map((product) => (
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
         </section>

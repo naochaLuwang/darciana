@@ -44,15 +44,7 @@ export function ProductImage({
     </span>
   );
 }
-export function ProductCard({
-  product,
-  index = 0,
-  eager = false,
-}: {
-  product: Product;
-  index?: number;
-  eager?: boolean;
-}) {
+export function ProductCard({ product, eager = false }: { product: Product; eager?: boolean }) {
   const { saved, toggleSaved } = useShop();
   const price = startingPrice(product);
   const inStock = product.product_variants.some((variant) => variant.stock > 0);
@@ -60,7 +52,7 @@ export function ProductCard({
     product.has_variants || product.base_price === null ? null : roundRupees(product.base_price);
   return (
     <article className="product-card">
-      <div className={`product-photo tint-${index % 4}`}>
+      <div className="product-photo">
         <Link href={`/product/${product.slug}`} aria-label={`View ${product.name}`}>
           <ProductImage src={product.thumbnail_url} alt={product.name} eager={eager} />
         </Link>

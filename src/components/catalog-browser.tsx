@@ -185,7 +185,7 @@ export function CatalogBrowser({
       ) : ordered.length ? (
         <div className="product-grid catalog-grid">
           {ordered.map((product, index) => (
-            <ProductCard key={product.id} product={product} index={index} eager={index < 4} />
+            <ProductCard key={product.id} product={product} eager={index < 4} />
           ))}
         </div>
       ) : (
