@@ -2339,6 +2339,20 @@ body:has(.bag-checkout-dock) .app-content {
   min-height: 50px;
   justify-content: space-between;
 }
+.checkout-location[data-invalid='true'],
+.checkout-terms-control[data-invalid='true'] {
+  outline: 2px solid var(--negative);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+.delivery-area-input.invalid {
+  border-color: var(--negative);
+  box-shadow: 0 0 0 1px var(--negative);
+}
+.checkout-field-error {
+  margin-top: 8px;
+  font-size: 12px;
+}
 .checkout-sheet {
   position: fixed;
   inset: auto 0 0;

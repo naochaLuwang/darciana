@@ -31,6 +31,8 @@ export function CheckoutForm({
   const { lines, items, total, count, clear } = useShop();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState('');
+  const [attempted, setAttempted] = useState(false);
+  const form = useRef<HTMLFormElement>(null);
   const [address, setAddress] = useState(savedAddress);
   const [addressOpen, setAddressOpen] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
@@ -79,6 +81,9 @@ export function CheckoutForm({
   const invalid =
     lines.length !== items.length || lines.some((line) => line.quantity > line.variant.stock);
   const hasDeliveryAddress = addressSchema.safeParse(address).success;
+  const addressInvalid = attempted && !hasDeliveryAddress;
+  const areaInvalid = attempted && !selectedArea;
+  const termsInvalid = attempted && !termsAccepted;
   const ready =
     hasDeliveryAddress &&
     !!selectedArea &&
@@ -87,9 +92,27 @@ export function CheckoutForm({
     !areasError &&
     !invalid;
   function handleSubmit() {
-    if (!ready || !address || !selectedArea || grandTotal === null || pending || !paymentMode)
-      return;
+    if (pending) return;
+    setAttempted(true);
     setError('');
+    if (!ready || !address || !selectedArea || grandTotal === null || !paymentMode) {
+      const selector = !hasDeliveryAddress
+        ? '.checkout-location'
+        : !selectedArea
+          ? '[role="combobox"]'
+          : !termsAccepted
+            ? '#checkout-accept-terms'
+            : null;
+      const target = selector ? form.current?.querySelector<HTMLElement>(selector) : null;
+      target?.focus({ preventScroll: true });
+      target?.scrollIntoView({
+        block: 'center',
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 'instant'
+          : 'smooth',
+      });
+      return;
+    }
     requestId.current ??= crypto.randomUUID();
     startTransition(async () => {
       try {
@@ -120,7 +143,9 @@ export function CheckoutForm({
   return (
     <>
       <form
+        ref={form}
         className="compact-checkout"
+        noValidate
         onSubmit={(event) => {
           event.preventDefault();
           handleSubmit();
@@ -133,6 +158,8 @@ export function CheckoutForm({
             className="checkout-location"
             aria-label="Select delivery address"
             aria-haspopup="dialog"
+            data-invalid={addressInvalid || undefined}
+            aria-describedby={addressInvalid ? 'checkout-address-error' : undefined}
             disabled={pending}
             onClick={() => setAddressOpen(true)}
           >
@@ -156,6 +183,11 @@ export function CheckoutForm({
             </span>
             <ChevronRight size={18} />
           </button>
+          {addressInvalid ? (
+            <p id="checkout-address-error" className="form-error checkout-field-error" role="alert">
+              Select a delivery location.
+            </p>
+          ) : null}
           {areasError ? (
             <p role="alert" className="form-error">
               {areasError}
@@ -169,6 +201,7 @@ export function CheckoutForm({
                 value={areaId}
                 onChange={setAreaId}
                 disabled={pending}
+                error={areaInvalid ? 'Select a shipping area.' : undefined}
               />
             </div>
           ) : (
@@ -242,12 +275,14 @@ export function CheckoutForm({
             {error}
           </p>
         ) : null}
-        <div className="checkout-terms-control">
+        <div className="checkout-terms-control" data-invalid={termsInvalid || undefined}>
           <input
             id="checkout-accept-terms"
             aria-label="I accept the terms and conditions"
             type="checkbox"
             checked={termsAccepted}
+            aria-invalid={termsInvalid || undefined}
+            aria-describedby={termsInvalid ? 'checkout-terms-error' : undefined}
             onChange={(event) => setTermsAccepted(event.target.checked)}
             required
             disabled={pending}
@@ -259,10 +294,15 @@ export function CheckoutForm({
             </button>
           </span>
         </div>
+        {termsInvalid ? (
+          <p id="checkout-terms-error" className="form-error checkout-field-error" role="alert">
+            Accept the terms and conditions.
+          </p>
+        ) : null}
         <button
           type="submit"
           className="button button-dark checkout-confirm"
-          disabled={pending || !ready}
+          disabled={pending || invalid || !!areasError || !areas.length}
         >
           {pending ? 'Confirming…' : 'Confirm and order'}
           <ArrowRight size={17} />

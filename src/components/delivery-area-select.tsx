@@ -11,6 +11,7 @@ export function DeliveryAreaSelect({
   required = true,
   label = 'Delivery area',
   showHelp = true,
+  error,
 }: {
   areas: DeliveryArea[];
   value: string;
@@ -19,6 +20,7 @@ export function DeliveryAreaSelect({
   required?: boolean;
   label?: string;
   showHelp?: boolean;
+  error?: string;
 }) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
@@ -56,7 +58,7 @@ export function DeliveryAreaSelect({
           {required ? 'Required' : 'Optional'}
         </span>
       </label>
-      <div className={`delivery-area-input ${open ? 'open' : ''}`}>
+      <div className={`delivery-area-input ${open ? 'open' : ''} ${error ? 'invalid' : ''}`}>
         <MapPin size={18} />
         <input
           ref={input}
@@ -69,7 +71,11 @@ export function DeliveryAreaSelect({
           aria-activedescendant={
             open && options[highlight] ? `${id}-option-${highlight}` : undefined
           }
-          aria-describedby={showHelp ? `${id}-help` : undefined}
+          aria-invalid={!!error || undefined}
+          aria-describedby={
+            [showHelp ? `${id}-help` : '', error ? `${id}-error` : ''].filter(Boolean).join(' ') ||
+            undefined
+          }
           autoComplete="off"
           enterKeyHint="done"
           disabled={disabled}
@@ -193,6 +199,11 @@ export function DeliveryAreaSelect({
           {selected
             ? `${selected.price === 0 ? 'Free delivery' : `${money(selected.price)} delivery`} to ${selected.name}.`
             : 'Choose an area from the list to see your delivery charge.'}
+        </p>
+      ) : null}
+      {error ? (
+        <p id={`${id}-error`} className="form-error checkout-field-error" role="alert">
+          {error}
         </p>
       ) : null}
     </div>

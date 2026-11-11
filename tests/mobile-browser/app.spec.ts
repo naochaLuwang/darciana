@@ -51,6 +51,10 @@ test('profile, address book and COD checkout use the shared database actions', a
   page,
   context,
 }) => {
+  let submissions = 0;
+  page.on('request', (request) => {
+    if (request.url().includes('/rpc/storefront_submit_order')) submissions += 1;
+  });
   await signIn(page);
   await page.getByLabel('Full name', { exact: true }).fill('Native Customer');
   await page.getByLabel('Mobile number', { exact: true }).fill('9876543210');
@@ -60,7 +64,16 @@ test('profile, address book and COD checkout use the shared database actions', a
   await page.getByRole('button', { name: 'Add to bag', exact: true }).click();
   await page.goto('/#/checkout');
   const order = page.getByRole('button', { name: 'Confirm and order', exact: true });
-  await expect(order).toBeDisabled();
+  await expect(order).toBeEnabled();
+  await order.click();
+  const location = page.getByRole('button', { name: 'Select delivery address', exact: true });
+  const area = page.getByRole('combobox', { name: 'Shipping area', exact: true });
+  const terms = page.getByRole('checkbox', { name: 'I accept the terms and conditions' });
+  await expect(location).toHaveAttribute('data-invalid', 'true');
+  await expect(location).toBeFocused();
+  await expect(area).toHaveAttribute('aria-invalid', 'true');
+  await expect(terms).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByText('Select a delivery location.', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Select delivery address', exact: true }).click();
   await page.getByLabel('Street address', { exact: true }).fill('28 Garden Street');
   await page.getByLabel('City', { exact: true }).fill('Imphal');
@@ -68,12 +81,22 @@ test('profile, address book and COD checkout use the shared database actions', a
   await page.getByLabel('PIN code', { exact: true }).fill('795001');
   await page.getByRole('button', { name: 'Use this address', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await page.getByRole('combobox', { name: 'Shipping area', exact: true }).fill('Central');
+  await expect(location).not.toHaveAttribute('data-invalid', 'true');
+  await order.click();
+  await expect(area).toBeFocused();
+  await expect(page.getByText('Select a shipping area.', { exact: true })).toBeVisible();
+  await area.fill('Central');
   await page.getByRole('option', { name: /Central Market/ }).click();
   await expect(
     page.getByRole('radio', { name: 'Cash on Delivery (COD)', exact: true }),
   ).toBeChecked();
-  await page.getByRole('checkbox', { name: 'I accept the terms and conditions' }).check();
+  await expect(area).not.toHaveAttribute('aria-invalid', 'true');
+  await order.click();
+  await expect(terms).toBeFocused();
+  await expect(page.getByText('Accept the terms and conditions.', { exact: true })).toBeVisible();
+  await terms.check();
+  await expect(page.locator('.checkout-field-error')).toHaveCount(0);
+  expect(submissions).toBe(0);
   await context.setOffline(true);
   await expect(page.locator('.native-offline')).toBeVisible();
   await order.click();
@@ -81,10 +104,12 @@ test('profile, address book and COD checkout use the shared database actions', a
     'Reconnect before placing your order. Your bag is saved.',
   );
   await expect(page.getByRole('heading', { name: 'Order received', exact: true })).toHaveCount(0);
+  expect(submissions).toBe(0);
   await context.setOffline(false);
   await expect(page.locator('.native-offline')).toHaveCount(0);
   await order.click();
   await expect(page.getByRole('heading', { name: 'Order received', exact: true })).toBeVisible();
+  expect(submissions).toBe(1);
   await expect(page.getByText(/Total ₹349/)).toBeVisible();
   await page.getByRole('link', { name: 'View orders', exact: true }).click();
   await expect(page.getByLabel('Full name', { exact: true })).toHaveValue('Native Customer');

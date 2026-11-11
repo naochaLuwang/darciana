@@ -460,7 +460,7 @@ test('admin shipping setup feeds searchable checkout and saves delivery totals',
   await page.getByRole('button', { name: 'Add to bag', exact: true }).click();
   await page.goto('/checkout');
   const submit = page.getByRole('button', { name: 'Confirm and order', exact: true });
-  await expect(submit).toBeDisabled();
+  await expect(submit).toBeEnabled();
   const area = page.getByRole('combobox', { name: 'Shipping area', exact: true });
   await area.fill('Central');
   await area.press('ArrowDown');
@@ -477,7 +477,7 @@ test('admin shipping setup feeds searchable checkout and saves delivery totals',
     page.getByRole('listbox', { name: 'Delivery areas' }).getByRole('option'),
   ).toHaveCount(0);
   await expect(page.getByText('No matching area. Try a different area name.')).toBeVisible();
-  await expect(submit).toBeDisabled();
+  await expect(submit).toBeEnabled();
   await area.fill('north');
   await page.screenshot({ path: 'test-results/checkout-shipping-dropdown.png', fullPage: true });
   await page.getByRole('option', { name: /Imphal North/ }).click();
@@ -640,7 +640,7 @@ test('checkout can save without submitting, preserves failed edits and rejects a
   await page.goto('/checkout');
   await expect(page.locator('.checkout-location')).toContainText('Saved From Checkout');
   await expect(page.getByText('Select an available shipping area.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Confirm and order', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Confirm and order', exact: true })).toBeEnabled();
   await expect(page.getByRole('combobox', { name: 'Shipping area', exact: true })).toHaveValue('');
 });
 
@@ -684,15 +684,23 @@ test('compact mobile checkout offers COD with a cash icon and requires address, 
   await expect(page.getByRole('heading', { name: 'Shipping info', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Price details', exact: true })).toBeVisible();
   const confirm = page.getByRole('button', { name: 'Confirm and order', exact: true });
-  await expect(confirm).toBeDisabled();
+  await expect(confirm).toBeEnabled();
+  await confirm.click();
+  const deliveryLocation = page.getByRole('button', {
+    name: 'Select delivery address',
+    exact: true,
+  });
+  await expect(deliveryLocation).toBeFocused();
+  await expect(deliveryLocation).toHaveAttribute('data-invalid', 'true');
+  await expect(page.getByText('Select a delivery location.', { exact: true })).toBeVisible();
   const acceptTerms = page.getByRole('checkbox', { name: 'I accept the terms and conditions' });
   await page.getByRole('radio', { name: 'Cash on Delivery (COD)', exact: true }).check();
   await acceptTerms.check();
-  await expect(confirm).toBeDisabled();
+  await expect(confirm).toBeEnabled();
   const area = page.getByRole('combobox', { name: 'Shipping area', exact: true });
   await area.fill('Town');
   await page.getByRole('option', { name: /Town Centre/ }).click();
-  await expect(confirm).toBeDisabled(); // Area chosen, delivery location still missing.
+  await expect(confirm).toBeEnabled(); // Area chosen, delivery location still missing.
   await page.getByRole('button', { name: 'Clear delivery area' }).click();
   await page.getByRole('button', { name: 'Select delivery address', exact: true }).click();
   await fillAddress(page, 'Compact Customer');
@@ -704,11 +712,14 @@ test('compact mobile checkout offers COD with a cash icon and requires address, 
   await page.getByRole('button', { name: 'Use this address', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.locator('.checkout-location')).toContainText('Compact Customer');
-  await expect(confirm).toBeDisabled(); // Valid location, shipping area still missing.
+  await expect(confirm).toBeEnabled();
+  await confirm.click();
+  await expect(area).toBeFocused();
+  await expect(area).toHaveAttribute('aria-invalid', 'true');
   await acceptTerms.uncheck();
   await area.fill('Town');
   await page.getByRole('option', { name: /Town Centre/ }).click();
-  await expect(confirm).toBeDisabled();
+  await expect(confirm).toBeEnabled();
   await page.getByRole('radio', { name: 'Cash on Delivery (COD)', exact: true }).check();
   await expect(page.getByRole('combobox', { name: 'Payment mode', exact: true })).toHaveCount(0);
   await expect(
@@ -721,7 +732,7 @@ test('compact mobile checkout offers COD with a cash icon and requires address, 
   await expect(
     page.getByRole('radio', { name: 'Cash on Delivery (COD)', exact: true }),
   ).toBeChecked();
-  await expect(confirm).toBeDisabled();
+  await expect(confirm).toBeEnabled();
   const terms = page.getByRole('button', { name: 'Terms and conditions', exact: true });
   await terms.click();
   await expect(page.getByRole('dialog')).toContainText('No payment is collected at checkout.');
@@ -737,7 +748,7 @@ test('compact mobile checkout offers COD with a cash icon and requires address, 
   expect(confirmBox!.y + confirmBox!.height).toBeLessThanOrEqual(navBox!.y);
   await page.screenshot({ path: 'test-results/compact-checkout-mobile.png', fullPage: true });
   await page.getByRole('button', { name: 'Clear delivery area' }).click();
-  await expect(confirm).toBeDisabled();
+  await expect(confirm).toBeEnabled();
   await area.fill('Town');
   await page.getByRole('option', { name: /Town Centre/ }).click();
   await confirm.click();
