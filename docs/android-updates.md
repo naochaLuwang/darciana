@@ -2,6 +2,16 @@
 
 The website and native app share customer components, but they do not share a deployed JavaScript bundle. Android contains a compiled copy under `assets/public/`; it reads catalog data from Supabase. Publishing the website or changing database images does not install new gallery logic into an existing Android app.
 
+## 1.0.4 / version code 5 — 12 November 2026
+
+Upload `artifacts/daciana-1.0.4.aab` to the existing Daciana app in Play Console. The application ID remains `com.luwangtech.daciana`, and the bundle is signed with the existing upload key. Customer-facing [release notes](release-notes-1.0.4.txt) are ready to paste into the release.
+
+This update selects COD by default, highlights missing checkout details and focuses the first incomplete field, blocks checkout for unavailable bag items, improves action/secondary-text contrast, gives product cards and cart thumbnails white backgrounds, and shows an offline retry screen instead of leaving uncached screens loading. The bag stays on the device; orders require a connection.
+
+The Android release build, mobile TypeScript checks, mobile server-secret scan, bundletool validation, signature and upload-certificate comparison pass. All 48 production mobile files match the AAB assets. The manifest confirms version 1.0.4/code 5, target API 36, no debugging, no cleartext traffic and no Android backups. All four native libraries have 16 KB load-segment alignment, and the bundle requests 16 KB alignment. Evidence is under `artifacts/releases/1.0.4/`. These are local binary checks; this bundle has not been uploaded to Play or tested on a physical phone.
+
+Update the installed app through the same Play testing track, then confirm **More → Version 1.0.4**. Check missing address/area/terms highlights, removal of unavailable bag items, offline/reconnection, Google sign-in and push delivery on the phone before promoting the release.
+
 ## 1.0.3 / version code 4 — 10 November 2026
 
 This update adds **Sign in → Forgot password?**, password recovery through the existing PKCE callback, and a new-password screen in the bundled app. Resets use Supabase Auth through Resend SMTP and must open on the requesting device. The recovery grant expires after 15 minutes; successful password changes clear it and sign out sessions before returning to sign-in.

@@ -1,6 +1,6 @@
 # Daciana for Android
 
-**Name:** Daciana · **Application ID:** `com.luwangtech.daciana` · **Version:** 1.0.3 (code 4)
+**Name:** Daciana · **Application ID:** `com.luwangtech.daciana` · **Version:** 1.0.4 (code 5)
 
 The Capacitor 8 Android app bundles its customer interface inside the APK. It does not load a hosted website or install a PWA. The existing Next.js website and admin dashboard continue to run separately.
 

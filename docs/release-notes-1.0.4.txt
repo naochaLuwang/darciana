@@ -1,0 +1,5 @@
+Clearer checkout with missing details highlighted.
+Cash on Delivery is selected by default.
+Out-of-stock items are marked in your bag and block checkout.
+Improved button contrast and white product card backgrounds.
+Clearer offline messages, with your bag kept on the device.
