@@ -12,7 +12,9 @@ export function ShareApp() {
     setMessage('');
     const url =
       import.meta.env.VITE_PUBLIC_STORE_URL ||
-      `https://play.google.com/store/apps/details?id=${APP_ID}`;
+      (Capacitor.getPlatform() === 'ios'
+        ? import.meta.env.VITE_IOS_STORE_URL || 'https://dacianastore.in'
+        : `https://play.google.com/store/apps/details?id=${APP_ID}`);
     try {
       if (Capacitor.isNativePlatform())
         await Share.share({

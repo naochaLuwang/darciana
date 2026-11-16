@@ -128,6 +128,8 @@ The Android app is **Daciana**, application ID **com.luwangtech.daciana**. Its c
 
 Run `npm run android:debug` to build `artifacts/daciana-debug.apk`, or `npm run android:bundle` for a release App Bundle. See the [Android setup and release guide](docs/android-app.md) for SDK requirements, the Supabase redirect URL, account-deletion deployment, signing and installation. Mobile integration tests use `npm run test:mobile-ui`.
 
+The iPhone target uses the same bundled storefront. Run `npm run ios:simulator` to compile it, `npm run ios:open` for Xcode, or `npm run ios:test` for native UI checks. See the [iOS build guide](docs/ios-app.md) for team/profile configuration and the features still required before App Store submission.
+
 ## Live checkout verification
 
 The live catalog is connected, and read-only inspection confirmed the storefront order, shipping, address, and profile tables and RPCs. No real order submission was performed. Checkout also needs at least one active delivery area and correctly configured Auth callbacks. Existing live catalog tables and data have not been modified by this build.

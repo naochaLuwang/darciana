@@ -37,6 +37,17 @@ local.properties
 *.dex
 *.hprof
 
+# generated iOS builds and per-user Xcode state
+/ios/SourcePackages/
+/ios/build/
+*.xcarchive/
+*.ipa
+*.xcuserstate
+*.mobileprovision
+*.provisionprofile
+*.p8
+/ios/App/App/GoogleService-Info.plist
+
 # signing keys and private certificates
 *.keystore
 *.jks

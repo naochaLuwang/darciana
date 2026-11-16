@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { SecureStorage } from '@aparajita/capacitor-secure-storage';
 
-// Session tokens use Android KeyStore-backed encryption. Browser storage is
+// Session tokens use Android KeyStore encryption or the iOS Keychain. Browser storage is
 // used only by the local development/Playwright preview, never as a native fallback.
 export const authStorage = {
   async getItem(key: string): Promise<string | null> {

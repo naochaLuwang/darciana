@@ -90,7 +90,9 @@ export function Runtime({ children }: { children: ReactNode }) {
       .catch(() => {});
     if (Capacitor.isNativePlatform()) {
       document.documentElement.dataset.native = 'true';
-      void SystemBars.setStyle({ style: SystemBarsStyle.Dark }).catch(() => {});
+      void SystemBars.setStyle({
+        style: Capacitor.getPlatform() === 'ios' ? SystemBarsStyle.Light : SystemBarsStyle.Dark,
+      }).catch(() => {});
       register(
         NativeApp.addListener('appUrlOpen', ({ url }) => {
           void completeAuthCallback(url).catch(() =>
@@ -140,7 +142,7 @@ export function Runtime({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
+    if (Capacitor.getPlatform() !== 'android') return;
     let disposed = false;
     let handle: PluginListenerHandle | undefined;
     void NativeApp.addListener('backButton', () => {
