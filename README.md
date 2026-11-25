@@ -44,7 +44,7 @@ Tailwind v4 runs through the standard `@tailwindcss/postcss` configuration in `p
 
 Open [http://localhost:3000/admin](http://localhost:3000/admin). The admin console has its own responsive navigation, separate from the customer app tabs.
 
-Use **Admin → Prices** (`/admin/prices`) to update prices and discounts. The page shows a compact product list. Select a product to open its price editor, choose an option if needed, then use **Save changes**. **Add discount** reveals optional discount controls; **Cancel** discards unsaved edits. This section uses the existing authenticated product-save transaction, so an installed admin dashboard needs no new SQL setup. Stale edits are rejected if another change happens before saving.
+Use **Admin → Prices** (`/admin/prices`) to update prices and discounts in an inventory-style list. Products with variants have a product heading and separate variant sub-rows. Edit a row's price and discount, check its whole-rupee selling-price preview, then use **Save price**; the reset control discards that row's draft. Checkboxes select individual rows, all variants of a product or the current page for a bulk price or discount update. Bulk edits preserve unselected prices and report conflicts per product. Search, category (including subcategories and additional assignments), visibility filters and pagination work together. This section uses the existing authenticated product-save transaction, so an installed admin dashboard needs no new SQL setup. Stale edits are rejected if another change happens before saving.
 
 The UI and database scripts are implemented. Read-only inspection confirmed the live storefront tables and RPCs, including profiles and saved addresses. Owner sign-in, storage policies, and live mutations still need verification. No live catalog records, orders, or auth accounts were changed while building this dashboard.
 
@@ -141,7 +141,7 @@ The live catalog is connected, and read-only inspection confirmed the storefront
 
 The setup script expects the existing catalog schema inspected in this project. Treat it as a one-time bootstrap script, not an idempotent migration. Do not expose the `private` schema through the Data API. Run Supabase's database advisors after applying it.
 
-An order request is **not a paid or reserved order**. Delivery is priced from the customer's selected area. New checkout requests use the selected payment mode and await store confirmation. The app does not charge a card, decrement inventory, or send order emails. Those integrations can be added once the payment and fulfilment flow is chosen.
+An order request is **not a paid or reserved order**. Delivery is priced from the customer's selected area. New checkout requests use the selected payment mode and await store confirmation. The app does not charge a card or decrement inventory. With the [Resend setup](docs/resend-email.md), new orders and delivery-status changes send separate customer and admin emails, with recorded payment details and provider acceptance history under Admin → Notifications.
 
 ## Order request implementation
 
@@ -211,6 +211,8 @@ Amounts use whole rupees throughout the app. Apply [the whole-rupee database upg
 Store images use Supabase Storage. See [image storage and uploads](docs/media-storage.md) for admin uploads, artwork updates, and existing legacy image links.
 
 Android push setup and testing: [FCM notifications](docs/push-notifications.md). Deployments using push also require the server-only `FIREBASE_SERVICE_ACCOUNT_BASE64` variable.
+
+Order delivery stages, Paid/Unpaid tracking and automatic delivery-status push notifications: [fulfilment setup](docs/order-fulfilment.md). Apply [the database upgrade](supabase/order-fulfilment-setup.sql) before deploying these controls.
 
 Deploy as a Node-compatible Next.js app, configure the two public Supabase environment variables and server-only `SUPABASE_SECRET_KEY`, verify the database setup, and configure the production auth callback URL. Build with `npm run build` and start with `npm start`. This task creates a local app and does not publish a hosted site.
 

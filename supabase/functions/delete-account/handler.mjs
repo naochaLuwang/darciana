@@ -2,12 +2,19 @@
 // without a service key or a connection to the live project.
 import { corsHeaders } from '@supabase/supabase-js/cors';
 
-export function createDeleteAccountHandler({ createClient, url, publicKey, secretKey }) {
+export function createDeleteAccountHandler({
+  createClient,
+  url,
+  publicKey,
+  secretKey,
+  revokeApple,
+}) {
   // Native WebViews send authenticated requests directly, without the web server.
   // CORS grants no authority: every deletion still verifies the caller and proof.
   const headers = {
     ...corsHeaders,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'X-Daciana-Apple-Deletion': revokeApple ? 'available' : 'unconfigured',
   };
   const reply = (status, body) => Response.json(body, { status, headers });
   return async function handle(request) {
@@ -27,7 +34,39 @@ export function createDeleteAccountHandler({ createClient, url, publicKey, secre
       const body = await request.json().catch(() => null);
       if (body?.confirmation !== 'DELETE')
         return reply(400, { error: 'Enter your password and type DELETE to confirm.' });
-      if (body.reauthentication === 'google') {
+      const appleIdentity = user.identities?.find((identity) => identity.provider === 'apple');
+      const appleLinked =
+        appleIdentity ||
+        user.app_metadata?.providers?.includes('apple') ||
+        user.app_metadata?.provider === 'apple';
+      if (appleLinked || body.reauthentication === 'apple') {
+        if (body.reauthentication !== 'apple' || !appleIdentity?.identity_data?.sub)
+          return reply(400, { error: 'Confirm with your Apple account to delete this account.' });
+        if (!revokeApple)
+          return reply(503, { error: 'Apple account deletion is unavailable. Contact the store.' });
+        if (
+          typeof body.identityToken !== 'string' ||
+          body.identityToken.length > 8192 ||
+          typeof body.authorizationCode !== 'string' ||
+          !body.authorizationCode ||
+          body.authorizationCode.length > 4096 ||
+          typeof body.nonce !== 'string' ||
+          !/^[a-f0-9]{64}$/.test(body.nonce)
+        )
+          return reply(400, { error: 'Confirm with Apple again. Your account was not deleted.' });
+        try {
+          await revokeApple({
+            identityToken: body.identityToken,
+            authorizationCode: body.authorizationCode,
+            nonce: body.nonce,
+            subject: appleIdentity.identity_data.sub,
+          });
+        } catch {
+          return reply(400, {
+            error: 'Confirm with the same Apple account again. Your account was not deleted.',
+          });
+        }
+      } else if (body.reauthentication === 'google') {
         // Verify signed claims, not decoded browser input or user_metadata.
         // A refreshed token's iat is insufficient: require a recent OAuth AMR.
         const verified = await client.auth.getClaims(token);

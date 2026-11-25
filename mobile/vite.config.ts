@@ -68,6 +68,7 @@ export default defineConfig(({ mode }) => {
           replacement: client(`actions/${name}.ts`),
         })),
         { find: '@/components/share-app', replacement: client('native-share.tsx') },
+        { find: '@/components/apple-sign-in', replacement: client('apple-sign-in.tsx') },
         { find: '@/components/push-settings', replacement: client('native-push-settings.tsx') },
         { find: '@/components/delete-account', replacement: client('native-delete-account.tsx') },
         { find: '@', replacement: resolve(root, 'src') },

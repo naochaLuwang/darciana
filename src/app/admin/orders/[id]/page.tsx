@@ -9,6 +9,8 @@ import { adminSession, type AdminOrder } from '@/lib/admin';
 import { money } from '@/lib/commerce';
 import { AdminHeading, AdminNotice, adminDate } from '@/components/admin/common';
 import { OrderStatus } from '@/components/admin/order-status';
+import { PaymentStatus } from '@/components/admin/payment-status';
+import { orderStatusLabel } from '@/lib/order-status';
 export const metadata = { title: 'Review request' };
 export default async function ReviewOrder({ params }: { params: Promise<{ id: string }> }) {
   const session = await adminSession();
@@ -18,7 +20,7 @@ export default async function ReviewOrder({ params }: { params: Promise<{ id: st
   const result = await session.db
     .from('storefront_order_requests')
     .select(
-      'id,user_id,created_at,status,item_total,shipping_area_name,shipping_price,order_total,shipping,items',
+      'id,user_id,created_at,status,payment_status,payment_updated_at,item_total,shipping_area_name,shipping_price,order_total,shipping,items',
     )
     .eq('id', id)
     .maybeSingle();
@@ -42,7 +44,7 @@ export default async function ReviewOrder({ params }: { params: Promise<{ id: st
           <Card className="admin-form-card gap-5 p-6">
             <CardHeader className="admin-panel-heading">
               <h2>Requested items</h2>
-              <StatusBadge status={order.status}>{order.status.replaceAll('_', ' ')}</StatusBadge>
+              <StatusBadge status={order.status}>{orderStatusLabel(order.status)}</StatusBadge>
             </CardHeader>
             {order.items.map((item, index) => (
               <div key={index} className="admin-order-item">
@@ -83,7 +85,7 @@ export default async function ReviewOrder({ params }: { params: Promise<{ id: st
               {order.order_total == null
                 ? 'This earlier request has no saved delivery charge. Confirm delivery separately with the customer.'
                 : order.shipping.payment_mode === 'manual_upi'
-                  ? 'Manual UPI selected. Share payment details after confirming the request; payment has not been verified by the app.'
+                  ? 'Manual UPI selected. Confirm receipt before marking the payment paid.'
                   : order.shipping.payment_mode === 'cash_on_delivery'
                     ? 'Cash on delivery. Review stock and confirm this request before fulfilment.'
                     : 'These item and delivery prices were saved when the customer submitted the request. Payment is arranged separately.'}
@@ -112,10 +114,21 @@ export default async function ReviewOrder({ params }: { params: Promise<{ id: st
             ) : null}
           </Card>
         </div>
-        <Card className="admin-form-card gap-5 p-6">
-          <h2>Manage request</h2>
-          <OrderStatus key={order.status} id={order.id} status={order.status} />
-        </Card>
+        <div className="admin-editor-aside">
+          <Card className="admin-form-card gap-5 p-6">
+            <h2>Delivery status</h2>
+            <OrderStatus key={order.id} id={order.id} status={order.status} />
+          </Card>
+          <Card className="admin-form-card gap-5 p-6">
+            <h2>Payment status</h2>
+            <PaymentStatus
+              key={order.id}
+              id={order.id}
+              status={order.payment_status}
+              updatedAt={order.payment_updated_at}
+            />
+          </Card>
+        </div>
       </div>
     </>
   );

@@ -1,4 +1,5 @@
 import { paymentLabel } from '@/lib/payment';
+import { orderStatusLabel } from '@/lib/order-status';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { AuthForm } from '@/components/auth-form';
@@ -54,7 +55,7 @@ export default async function Account({
     supabase!
       .from('storefront_order_requests')
       .select(
-        'id,items,item_total,shipping_area_name,shipping_price,order_total,status,created_at,shipping',
+        'id,items,item_total,shipping_area_name,shipping_price,order_total,status,payment_status,created_at,shipping',
       )
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
@@ -70,6 +71,7 @@ export default async function Account({
     shipping_price: number | null;
     order_total: number | null;
     status: string;
+    payment_status: 'unpaid' | 'paid';
     created_at: string;
     shipping: { payment_mode?: string };
   };
@@ -141,11 +143,7 @@ export default async function Account({
                       })}
                     </p>
                   </div>
-                  <span className="order-status">
-                    {order.status === 'awaiting_confirmation'
-                      ? 'Pending confirmation'
-                      : order.status.replaceAll('_', ' ')}
-                  </span>
+                  <span className="order-status">{orderStatusLabel(order.status)}</span>
                 </div>
                 {order.items.map((item, index) => (
                   <div className="order-line" key={index}>
@@ -183,6 +181,10 @@ export default async function Account({
                     <span>{paymentLabel(order.shipping.payment_mode)}</span>
                   </div>
                 ) : null}
+                <div className="order-shipping-breakdown">
+                  <span>Payment status</span>
+                  <span>{order.payment_status === 'paid' ? 'Paid' : 'Unpaid'}</span>
+                </div>
                 {order.order_total == null ? (
                   <p className="tax-note">Delivery charge to be confirmed.</p>
                 ) : order.shipping?.payment_mode === 'manual_upi' ? (

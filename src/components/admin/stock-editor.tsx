@@ -10,16 +10,23 @@ export function StockEditor({
   id,
   stock,
   updatedAt,
+  disabled = false,
 }: {
   id: string;
   stock: number;
   updatedAt: string;
+  disabled?: boolean;
 }) {
   const [value, setValue] = useState(String(stock));
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+  const [previousUpdatedAt, setPreviousUpdatedAt] = useState(updatedAt);
+  if (previousUpdatedAt !== updatedAt) {
+    setPreviousUpdatedAt(updatedAt);
+    setValue(String(stock));
+  }
   return (
     <form
       className="admin-stock-editor"
@@ -45,7 +52,7 @@ export function StockEditor({
         });
       }}
     >
-      <FormReady>
+      <FormReady disabled={disabled || pending}>
         <div>
           <Input
             aria-label="Stock quantity"

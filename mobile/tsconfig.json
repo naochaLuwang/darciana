@@ -26,6 +26,7 @@
       "@/app/account/actions": ["./src/actions/account.ts"],
       "@/app/checkout/actions": ["./src/actions/checkout.ts"],
       "@/components/share-app": ["./src/native-share.tsx"],
+      "@/components/apple-sign-in": ["./src/apple-sign-in.tsx"],
       "@/components/delete-account": ["./src/native-delete-account.tsx"],
       "@/*": ["../src/*"]
     }

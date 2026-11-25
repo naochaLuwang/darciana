@@ -1,4 +1,4 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { z } from 'zod';
@@ -24,7 +24,14 @@ let registration: { resolve: (token: string) => void; reject: (error: Error) => 
   null;
 let readingPreferences: Promise<PushPreferences> | undefined;
 
-const supported = () => Capacitor.getPlatform() === 'android';
+export const supportsPush = () => ['android', 'ios'].includes(Capacitor.getPlatform());
+const Messaging = registerPlugin<{ enable(): Promise<void>; disable(): Promise<void> }>(
+  'DacianaMessaging',
+);
+const unregister = async () => {
+  await PushNotifications.unregister().catch(() => {});
+  if (Capacitor.getPlatform() === 'ios') await Messaging.disable().catch(() => {});
+};
 const changed = () => window.dispatchEvent(new Event('daciana:push-changed'));
 function serial<T>(operation: () => Promise<T>): Promise<T> {
   const task = queue.then(operation, operation);
@@ -106,7 +113,9 @@ async function ensureListeners() {
     await PushNotifications.addListener('registrationError', () =>
       registration?.reject(
         new Error(
-          'This device could not register for notifications. Check Google Play services and try again.',
+          Capacitor.getPlatform() === 'ios'
+            ? 'This device could not register for notifications. Reconnect and try again.'
+            : 'This device could not register for notifications. Check Google Play services and try again.',
         ),
       ),
     );
@@ -137,6 +146,7 @@ async function ensureListeners() {
     await PushNotifications.addListener('pushNotificationReceived', () => {
       refreshScreens();
     });
+    if (Capacitor.getPlatform() !== 'android') return;
     await PushNotifications.createChannel({
       id: 'orders',
       name: 'Order updates',
@@ -166,6 +176,7 @@ async function ensureListeners() {
 }
 async function register(preferences: PushPreferences) {
   await ensureListeners();
+  if (Capacitor.getPlatform() === 'ios') await Messaging.enable();
   const token = await new Promise<string>((resolve, reject) => {
     const timeout = setTimeout(() => {
       registration = null;
@@ -195,7 +206,7 @@ async function disable(preferences: PushPreferences) {
   const next = { ...preferences, enabled: false, owner: null };
   await save(next);
   // Invalidate FCM locally as well as revoking the server association.
-  await PushNotifications.unregister().catch(() => {});
+  await unregister();
   await PushNotifications.removeAllDeliveredNotifications().catch(() => {});
   if (preferences.registered) {
     await deviceRequest('DELETE', preferences);
@@ -205,12 +216,12 @@ async function disable(preferences: PushPreferences) {
 }
 export function disablePush() {
   return serial(async () => {
-    if (supported()) await disable(await getPushPreferences());
+    if (supportsPush()) await disable(await getPushPreferences());
   });
 }
 export function detachPushAccount() {
   return serial(async () => {
-    if (!supported()) return;
+    if (!supportsPush()) return;
     const preferences = await getPushPreferences();
     if (!preferences.owner) return;
     // Invalidate the old private token before retaining the guest opt-in. A
@@ -225,13 +236,17 @@ export function detachPushAccount() {
 }
 export function enablePush(announcements: boolean) {
   return serial(async () => {
-    if (!supported()) throw new Error('Push notifications are available in the Android app.');
+    if (!supportsPush()) throw new Error('Push notifications are available in the mobile app.');
     const { data, error } = await supabase.auth.getSession();
     if (error) throw new Error('Could not read notification preferences. Please try again.');
     let permission = await PushNotifications.checkPermissions();
     if (permission.receive !== 'granted') permission = await PushNotifications.requestPermissions();
     if (permission.receive !== 'granted')
-      throw new Error('Allow notifications in Android Settings → Apps → Daciana → Notifications.');
+      throw new Error(
+        Capacitor.getPlatform() === 'ios'
+          ? 'Allow notifications in Settings → Notifications → Daciana.'
+          : 'Allow notifications in Android Settings → Apps → Daciana → Notifications.',
+      );
     const preferences = await getPushPreferences();
     const next = {
       ...preferences,
@@ -244,7 +259,7 @@ export function enablePush(announcements: boolean) {
       await save({ ...next, registered: true });
     } catch (error) {
       await save({ ...next, enabled: false, registered: true });
-      await PushNotifications.unregister().catch(() => {});
+      await unregister();
       await deviceRequest('DELETE', next).catch(() => {});
       throw error;
     }
@@ -252,7 +267,7 @@ export function enablePush(announcements: boolean) {
 }
 export function restorePush(userId: string | null) {
   return serial(async () => {
-    if (!supported()) return;
+    if (!supportsPush()) return;
     await ensureListeners();
     const preferences = await getPushPreferences();
     if (!preferences.enabled) {

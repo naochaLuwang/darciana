@@ -34,6 +34,10 @@ export const registrationSchema = installationSchema.extend({
 export function orderPush(status: string) {
   const messages: Record<string, string> = {
     confirmed: 'Your order has been confirmed.',
+    processing: 'Your order is being processed. We’re getting it ready to ship.',
+    shipped: 'Your order has been shipped. It’s on its way to you.',
+    out_for_delivery: 'Your order is out for delivery. Please be available to receive it.',
+    delivered: 'Your order has been delivered. Thank you for shopping with us.',
     completed: 'Your order is complete. Thank you for shopping with us.',
     cancelled: 'Your order has been cancelled. Contact the store if you need help.',
   };

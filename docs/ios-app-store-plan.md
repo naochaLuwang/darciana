@@ -1,6 +1,6 @@
 # Daciana iOS publishing plan
 
-Prepared 16 November 2026. **Implementation started:** the native iOS target, branding, callback scheme, team configuration, platform fixes and native UI test target are in place. See the [iOS build guide](ios-app.md). Apple sign-in, Apple-specific deletion, iOS FCM/APNs, distribution provisioning and physical-device acceptance remain open. Hosted Supabase/Firebase settings have not been changed.
+Prepared 16 November 2026. **Implementation started:** the native iOS target, branding, callback scheme, team configuration, platform fixes and native UI test target are in place. See the [iOS build guide](ios-app.md). Native Apple sign-in, Apple-specific deletion and the iOS FCM/APNs bridge are now implemented; the distribution profile is saved. The Firebase iOS app and local client configuration are prepared. Supabase Apple provider/secrets/deployment, Apple APNs key upload, signed validation and physical-device acceptance remain open. See [owner setup](ios-owner-setup.md).
 
 ## Agreed context and proposed scope
 
@@ -15,17 +15,17 @@ An Individual membership displays the account holder's legal name as the seller.
 
 ## Findings from this repository and Mac
 
-| Area             | Current state                                                              | Work needed                                                                 |
-| ---------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Native project   | Android only; no `ios/` or `@capacitor/ios`                                | Add and configure the iOS target                                            |
-| Build assets     | `mobile/dist`, bundled locally                                             | Reuse production build and secret scanning                                  |
-| Authentication   | Email/password and browser Google PKCE                                     | Add native Apple sign-in; verify iOS Google return links                    |
-| Account deletion | Password and fresh Google reauthentication                                 | Support Apple-only users and Apple authorization revocation                 |
-| Notifications    | Android-only guards in `mobile/src/push.ts` and `native-push-settings.tsx` | Add iOS registration through Firebase Messaging/APNs                        |
-| Share app        | Defaults to Google Play URL                                                | Use the App Store URL on iOS once the listing ID exists                     |
-| Session storage  | Secure-storage plugin supports iOS Keychain                                | Verify entitlement, session restoration, sign-out and deletion              |
-| Toolchain        | Xcode 26.6 installed                                                       | Verify selected SDK, simulator availability and signing                     |
-| Disk             | About 130 MB free when inspected                                           | Free space before installing dependencies, creating simulators or archiving |
+| Area             | Current state                                       | Work needed                                                             |
+| ---------------- | --------------------------------------------------- | ----------------------------------------------------------------------- |
+| Native project   | Capacitor iOS target implemented                    | Signed archive, validation and physical-device acceptance               |
+| Build assets     | `mobile/dist`, bundled locally                      | Reuse production build and secret scanning                              |
+| Authentication   | Email/password, Google PKCE and native Apple bridge | Enable Supabase Apple; test all providers on iPhone                     |
+| Account deletion | Apple proof verification and revocation implemented | Configure server key, deploy function and test disposable Apple account |
+| Notifications    | Native iOS FCM bridge and Firebase app configured   | Upload APNs key; verify iPhone delivery                                 |
+| Share app        | iOS uses website fallback                           | Set App Store URL once listing ID is available                          |
+| Session storage  | Secure-storage plugin supports iOS Keychain         | Verify entitlement, session restoration, sign-out and deletion          |
+| Toolchain        | Xcode 26.6 installed                                | Verify selected SDK, simulator availability and signing                 |
+| Disk             | Cleanup completed; free space changes during builds | Monitor available space while resolving native SDKs                     |
 
 Use roughly **20–30 GB of free disk space as a practical working budget**, not an Apple policy minimum. Do not delete upload keys, credentials or existing release bundles to make space.
 

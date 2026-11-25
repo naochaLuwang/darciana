@@ -22,7 +22,7 @@ const env = { ...local, ...process.env };
 const signed = task === 'archive';
 const simulator = task === 'simulator' || task === 'test';
 const team = env.DACIANA_IOS_TEAM_ID || 'VJ6CZ336M8';
-const number = env.DACIANA_IOS_BUILD_NUMBER || '1';
+const number = env.DACIANA_IOS_BUILD_NUMBER || '2';
 if (!/^[A-Z0-9]{10}$/.test(team)) throw new Error('Set a valid DACIANA_IOS_TEAM_ID.');
 if (!/^[1-9]\d*$/.test(number)) throw new Error('Use a positive DACIANA_IOS_BUILD_NUMBER.');
 const sdk = spawnSync(
@@ -71,6 +71,22 @@ if (simulator) {
   else args.push('build');
 } else {
   if (signed) {
+    const firebase = resolve(root, 'ios/App/App/GoogleService-Info.plist');
+    if (!existsSync(firebase))
+      throw new Error(
+        'Save Firebase iOS GoogleService-Info.plist at ios/App/App/GoogleService-Info.plist before archiving this notification-enabled app.',
+      );
+    for (const [key, expected] of [
+      ['BUNDLE_ID', 'com.luwangtech.daciana'],
+      ['PROJECT_ID', 'daciana-store'],
+    ]) {
+      if (
+        execFileSync('plutil', ['-extract', key, 'raw', '-o', '-', firebase], {
+          encoding: 'utf8',
+        }).trim() !== expected
+      )
+        throw new Error(`Firebase iOS configuration must use ${key} ${expected}.`);
+    }
     const profile =
       env.DACIANA_IOS_PROFILE_PATH || resolve(root, '.secrets/ios/AppStore.mobileprovision');
     if (!existsSync(profile))
@@ -78,6 +94,14 @@ if (simulator) {
         'Save an App Store Connect provisioning profile at .secrets/ios/AppStore.mobileprovision. Simulator and unsigned archive builds do not require a profile.',
       );
     const decoded = execFileSync('security', ['cms', '-D', '-i', profile]);
+    // Entitlement names contain literal dots; plutil key paths would treat
+    // those dots as nested dictionaries. Read the entitlement dictionary once.
+    const entitlements = JSON.parse(
+      execFileSync('plutil', ['-extract', 'Entitlements', 'json', '-o', '-', '-'], {
+        input: decoded,
+        encoding: 'utf8',
+      }),
+    );
     const field = (key) => {
       const result = spawnSync('plutil', ['-extract', key, 'raw', '-o', '-', '-'], {
         input: decoded,
@@ -97,6 +121,8 @@ if (simulator) {
       field('TeamIdentifier.0') !== team ||
       field('Entitlements.application-identifier') !== `${team}.com.luwangtech.daciana` ||
       field('Entitlements.get-task-allow') !== 'false' ||
+      field('Entitlements.aps-environment') !== 'production' ||
+      !entitlements['com.apple.developer.applesignin']?.includes('Default') ||
       hasField('ProvisionedDevices') ||
       field('ProvisionsAllDevices') === 'true'
     )
@@ -111,9 +137,9 @@ if (simulator) {
     await copyFile(profile, resolve(directory, `${uuid}.mobileprovision`));
     args.push(
       `DEVELOPMENT_TEAM=${team}`,
-      'CODE_SIGN_STYLE=Manual',
-      'CODE_SIGN_IDENTITY=Apple Distribution',
-      `PROVISIONING_PROFILE_SPECIFIER=${uuid}`,
+      // Apply the profile only to the app target. Command-line provisioning
+      // settings would also reach Firebase's non-provisioned resource bundles.
+      `DACIANA_IOS_SIGNING_PROFILE=${uuid}`,
     );
   } else args.push('CODE_SIGNING_ALLOWED=NO');
   args.push('-archivePath', archive, 'archive');

@@ -4,8 +4,9 @@ import { DeleteAccount as PasswordDeleteAccount } from '../../src/components/del
 import { useSession } from './session';
 import { beginGoogleSignIn } from './auth-flow';
 import { isDeviceOnline } from './network';
+import { deleteWithApple } from './apple-auth';
 
-function GoogleDeleteDialog({ onClose }: { onClose: () => void }) {
+function ProviderDeleteDialog({ onClose, apple }: { onClose: () => void; apple: boolean }) {
   const { user } = useSession();
   const ref = useRef<HTMLDialogElement>(null);
   const [confirmation, setConfirmation] = useState('');
@@ -40,7 +41,7 @@ function GoogleDeleteDialog({ onClose }: { onClose: () => void }) {
       </div>
       <p className="delete-account-warning">
         This permanently deletes your account, profile, saved addresses and order history. Confirm
-        with the same Google account to continue.
+        with the same {apple ? 'Apple' : 'Google'} account to continue.
       </p>
       <form
         className="form-stack"
@@ -54,8 +55,14 @@ function GoogleDeleteDialog({ onClose }: { onClose: () => void }) {
           setPending(true);
           setError('');
           try {
-            const result = await beginGoogleSignIn('account', user.id);
-            if (result.error) setError(result.error);
+            if (apple) await deleteWithApple();
+            else {
+              const result = await beginGoogleSignIn('account', user.id);
+              if (result.error) setError(result.error);
+            }
+          } catch (error) {
+            if ((error as { code?: string })?.code !== 'CANCELLED')
+              setError(error instanceof Error ? error.message : 'Please try again.');
           } finally {
             setPending(false);
           }
@@ -77,7 +84,7 @@ function GoogleDeleteDialog({ onClose }: { onClose: () => void }) {
           </p>
         ) : null}
         <button className="button button-danger" disabled={pending || confirmation !== 'DELETE'}>
-          {pending ? 'Connecting…' : 'Confirm with Google'}
+          {pending ? 'Connecting…' : `Confirm with ${apple ? 'Apple' : 'Google'}`}
         </button>
       </form>
     </dialog>
@@ -88,10 +95,11 @@ export function DeleteAccount() {
   const { user } = useSession();
   const [open, setOpen] = useState(false);
   const providers = user?.app_metadata?.providers as string[] | undefined;
+  const apple = providers?.includes('apple') || user?.app_metadata?.provider === 'apple';
   const googleOnly =
     (providers?.includes('google') || user?.app_metadata?.provider === 'google') &&
     !providers?.includes('email');
-  if (!googleOnly) return <PasswordDeleteAccount />;
+  if (!apple && !googleOnly) return <PasswordDeleteAccount />;
   return (
     <div className="delete-account-section">
       <button
@@ -101,7 +109,7 @@ export function DeleteAccount() {
       >
         <Trash2 size={16} /> Delete account
       </button>
-      {open ? <GoogleDeleteDialog onClose={() => setOpen(false)} /> : null}
+      {open ? <ProviderDeleteDialog apple={Boolean(apple)} onClose={() => setOpen(false)} /> : null}
     </div>
   );
 }

@@ -42,7 +42,7 @@ The payload contains an order reference and whole-rupee total, not the customer'
 ## Sending
 
 - **Admin → Notifications** sends announcements to devices with the announcements preference enabled. Enter a title, message and destination, review the preview, check the confirmation and send. Counts describe devices, not unique customers.
-- The order status form has an optional **Send the customer a push notification** checkbox. Supported statuses are confirmed, completed and cancelled. The order status is saved even if FCM is unavailable; the result explains any sending problem. Sends target only that order's account.
+- Delivery-status changes in the admin order form automatically notify the order's customer, including Processing, Shipped, Out for delivery, Delivered and Cancelled. Payment changes do not send push notifications. The status remains saved if FCM is unavailable, and the result explains any sending problem. See [fulfilment setup](order-fulfilment.md) for the database upgrade required before deployment.
 - Titles are limited to 80 characters and messages to 240. Notification taps accept only `/`, `/shop`, `/categories`, `/account`, `/more`, `/product/<slug>` or `/more/<slug>`. Order updates open the customer's account/orders screen.
 - The separate Android channels are **Order updates**, **New orders** (admin), and **Store announcements**. The white D notification icon is separate from the launcher icon.
 - Sending history prevents a repeated request from resending the same announcement or order status. FCM success means accepted by FCM, not proof of display/read. Expired tokens are removed; unknown sending outcomes are not automatically retried to avoid duplicates.

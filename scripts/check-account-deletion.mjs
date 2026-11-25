@@ -33,7 +33,14 @@ try {
     )
   )
     throw new Error(`Native app CORS preflight failed (HTTP ${preflight.status}).`);
-  console.log('PASS delete-account is deployed and accepts the Android app CORS preflight.');
+  console.log('PASS delete-account is deployed and accepts native app CORS preflight.');
+  if (process.argv.includes('--ios')) {
+    if (preflight.headers.get('x-daciana-apple-deletion') !== 'available')
+      throw new Error(
+        'Deploy the updated delete-account function and configure its Apple sign-in key secrets before iOS acceptance testing.',
+      );
+    console.log('PASS Apple revocation handler is deployed and its key secrets are present.');
+  }
 
   const unauthenticated = await fetch(endpoint, {
     method: 'POST',

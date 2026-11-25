@@ -49,7 +49,11 @@ test('push payloads require confirmation and restrict notification taps to store
     { path: '/admin' },
   ])
     assert.equal(announcementSchema.safeParse({ ...input, ...value }).success, false);
-  assert.equal(orderPush('shipped'), null, 'only supported order statuses have templates');
+  assert.equal(orderPush('unpaid'), null, 'payment changes do not send push notifications');
+  for (const status of ['processing', 'shipped', 'out_for_delivery', 'delivered']) {
+    assert.equal(orderPush(status).path, '/account');
+    assert.ok(orderPush(status).body.length > 0);
+  }
   assert.equal(orderPush('confirmed').path, '/account');
 });
 
@@ -384,6 +388,10 @@ test('order updates target only the matching customer; empty audiences and FCM f
   await deliverPush({ ...draft, audience: 'order', userId: customer }, fixture.db, messaging);
   assert.deepEqual(batches[0].tokens, ['owner-token']);
   assert.equal(batches[0].android.notification.channelId, 'orders');
+  assert.deepEqual(batches[0].apns, {
+    headers: { 'apns-push-type': 'alert', 'apns-priority': '10' },
+    payload: { aps: { sound: 'default' } },
+  });
   assert.ok(
     (
       await deliverPush(

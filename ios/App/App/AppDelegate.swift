@@ -1,14 +1,47 @@
 import UIKit
 import Capacitor
+import FirebaseCore
+import FirebaseMessaging
 
 @UIApplicationMain
-class AppDelegate: UIResponder, UIApplicationDelegate {
+class AppDelegate: UIResponder, UIApplicationDelegate, MessagingDelegate {
 
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        if let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
+           let options = FirebaseOptions(contentsOfFile: path),
+           options.bundleID == Bundle.main.bundleIdentifier {
+            FirebaseApp.configure(options: options)
+            Messaging.messaging().delegate = self
+        }
         return true
+    }
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        guard FirebaseApp.app() != nil, Messaging.messaging().isAutoInitEnabled else { return }
+        Messaging.messaging().apnsToken = deviceToken
+        // Registration-token mode deliberately matches the existing FCM server
+        // and database. Firebase's new FID-only mode is not wire compatible.
+        Messaging.messaging().token { token, error in
+            if let error = error {
+                NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+            } else if let token = token, Messaging.messaging().isAutoInitEnabled,
+                      application.isRegisteredForRemoteNotifications {
+                // The backend sends through FCM. Never forward the raw APNs token.
+                NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: token)
+            }
+        }
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+    }
+
+    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        guard let token = fcmToken, messaging.isAutoInitEnabled,
+              messaging.apnsToken != nil, UIApplication.shared.isRegisteredForRemoteNotifications else { return }
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: token)
     }
 
     func applicationWillResignActive(_ application: UIApplication) {

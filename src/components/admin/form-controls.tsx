@@ -107,7 +107,7 @@ export function AdminSelect({
   onValueChange: (value: string) => void;
   name?: string;
   placeholder?: string;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; disabled?: boolean }[];
 }) {
   const ready = useAdminReady();
   return (
@@ -122,7 +122,11 @@ export function AdminSelect({
       </SelectTrigger>
       <SelectContent position="popper">
         {options.map((option) => (
-          <SelectItem key={option.value} value={option.value || '__empty__'}>
+          <SelectItem
+            key={option.value}
+            value={option.value || '__empty__'}
+            disabled={option.disabled}
+          >
             {option.label}
           </SelectItem>
         ))}

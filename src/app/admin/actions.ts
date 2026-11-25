@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { adminSession, adminError } from '@/lib/admin';
 import { createClient } from '@/lib/supabase/server';
-import { orderPush } from '@/lib/push';
+import { notifyOrderChange } from '@/lib/order-notifications';
 import { sendAdminPush } from '@/lib/push-server';
 import { persistAdminImage } from '@/lib/media-upload';
 import { validImageChange } from '@/lib/media';
@@ -14,6 +14,7 @@ import {
   stockSchema,
   statusSchema,
   orderStatusSchema,
+  paymentStatusSchema,
   shippingAreaSchema,
   deleteProductSchema,
 } from '@/lib/admin-validation';
@@ -125,6 +126,51 @@ export async function saveStock(input: unknown): Promise<AdminResult> {
       })
     : { error: result.error.issues[0].message };
 }
+export async function saveBulkStock(input: unknown): Promise<{
+  updated: string[];
+  failed: { id: string; error: string }[];
+  error?: string;
+}> {
+  const parsed = z.array(stockSchema).min(1).max(2500).safeParse(input);
+  if (!parsed.success || new Set(parsed.data?.map((row) => row.id)).size !== parsed.data?.length)
+    return {
+      updated: [],
+      failed: [],
+      error: 'Select rows and enter a whole stock quantity from 0 to 1,000,000.',
+    };
+  const session = await adminSession();
+  if (!session)
+    return { updated: [], failed: [], error: 'Admin access is required. Please sign in again.' };
+  const updated: string[] = [];
+  const failed: { id: string; error: string }[] = [];
+  for (let offset = 0; offset < parsed.data.length; offset += 5) {
+    const batch = parsed.data.slice(offset, offset + 5);
+    const results = await Promise.allSettled(
+      batch.map((row) =>
+        session.db.rpc('storefront_admin_set_stock', {
+          p_variant_id: row.id,
+          p_stock: row.stock,
+          p_expected_updated_at: row.expected_updated_at,
+        }),
+      ),
+    );
+    results.forEach((result, index) => {
+      const id = batch[index].id;
+      if (result.status === 'rejected') {
+        failed.push({ id, error: 'Could not confirm this update. Refresh before trying again.' });
+      } else if (result.value.error) {
+        failed.push({ id, error: adminError(result.value.error) });
+      } else {
+        updated.push(id);
+      }
+    });
+  }
+  if (updated.length) {
+    revalidatePath('/admin', 'layout');
+    revalidatePath('/', 'layout');
+  }
+  return { updated, failed };
+}
 export async function saveProductStatus(input: unknown): Promise<AdminResult> {
   const result = statusSchema.safeParse(input);
   return result.success
@@ -136,35 +182,39 @@ export async function saveProductStatus(input: unknown): Promise<AdminResult> {
     : { error: result.error.issues[0].message };
 }
 export async function saveOrderStatus(input: unknown): Promise<AdminResult> {
-  const result = orderStatusSchema
-    .extend({ notify_customer: z.boolean().default(false) })
-    .safeParse(input);
+  const result = orderStatusSchema.safeParse(input);
   if (!result.success) return { error: result.error.issues[0].message };
   const saved = await mutate('storefront_admin_set_order_status', {
     p_order_id: result.data.id,
     p_status: result.data.status,
     p_expected_status: result.data.expected_status,
   });
-  if (saved.error || !result.data.notify_customer) return saved;
+  if (saved.error) return saved;
   const session = await adminSession();
   if (!session) return { success: 'Status saved. Sign in again to send a notification.' };
-  const { data: order, error } = await session.db
-    .from('storefront_order_requests')
-    .select('user_id')
-    .eq('id', result.data.id)
-    .single();
-  const message = orderPush(result.data.status);
-  if (error || !order?.user_id || !message)
-    return { success: 'Status saved. Customer notification is unavailable.' };
-  const notification = await sendAdminPush({
-    ...message,
-    audience: 'order',
-    actorId: session.user.id,
-    userId: order.user_id,
-    eventKey: `order:${result.data.id}:${result.data.status}`,
-  });
+  const notification = await notifyOrderChange(
+    {
+      orderId: result.data.id,
+      status: result.data.status,
+      actorId: session.user.id,
+    },
+    session.db,
+    sendAdminPush,
+  );
   revalidatePath('/admin/notifications');
   return { success: `Status saved. ${notification.error ?? notification.success}` };
+}
+export async function savePaymentStatus(input: unknown): Promise<AdminResult> {
+  const result = paymentStatusSchema.safeParse(input);
+  if (!result.success) return { error: result.error.issues[0].message };
+  const saved = await mutate('storefront_admin_set_payment_status', {
+    p_order_id: result.data.id,
+    p_status: result.data.status,
+    p_expected_status: result.data.expected_status,
+    p_expected_updated_at: result.data.expected_updated_at,
+  });
+  if (saved.error) return saved;
+  return { success: 'Payment status saved.' };
 }
 export async function uploadAdminImage(form: FormData): Promise<AdminResult> {
   return persistAdminImage(form, { getSession: adminSession });

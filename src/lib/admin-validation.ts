@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isStoreMediaUrl } from './media.ts';
 import { normalizeCategorySlug } from './category-slug.ts';
+import { orderStatuses, orderTransitions } from './order-status.ts';
 
 const price = z.number().finite().int('Use whole rupees, without decimals.').min(0).max(1000000);
 export const imageUrl = z.union([
@@ -187,17 +188,24 @@ export const deleteProductSchema = z.object({
   expected_updated_at: z.iso.datetime({ offset: true }),
   confirmation: z.literal('DELETE', { error: 'Type DELETE to confirm.' }),
 });
-export const orderStatusSchema = z.object({
-  id: z.uuid(),
-  expected_status: z.enum(['awaiting_confirmation', 'confirmed', 'completed', 'cancelled']),
-  status: z.enum(['confirmed', 'completed', 'cancelled']),
-});
-export const orderTransitions: Record<string, string[]> = {
-  awaiting_confirmation: ['confirmed', 'cancelled'],
-  confirmed: ['completed', 'cancelled'],
-  completed: [],
-  cancelled: [],
-};
+export const orderStatusSchema = z
+  .object({
+    id: z.uuid(),
+    expected_status: z.enum(orderStatuses),
+    status: z.enum(orderStatuses),
+  })
+  .refine(
+    (value) => orderTransitions[value.expected_status].includes(value.status),
+    'Choose the next delivery stage or cancel the order.',
+  );
+export const paymentStatusSchema = z
+  .object({
+    id: z.uuid(),
+    expected_status: z.enum(['unpaid', 'paid']),
+    expected_updated_at: z.iso.datetime({ offset: true }),
+    status: z.enum(['unpaid', 'paid']),
+  })
+  .refine((value) => value.status !== value.expected_status, 'Choose a different payment status.');
 export function slugify(value: string) {
   return value
     .toLowerCase()

@@ -25,11 +25,19 @@ function fixture() {
   const state = {
     order: sample(),
     user: { id: customer, email: 'customer@example.com', email_confirmed_at: '2026-01-01' },
+    admins: [],
+    adminLookupError: false,
     logs: new Map(),
     sent: [],
     lookups: 0,
   };
   const db = {
+    rpc: async (name) => {
+      assert.equal(name, 'storefront_order_email_admins');
+      return state.adminLookupError
+        ? { error: { code: 'unavailable' }, data: null }
+        : { data: state.admins, error: null };
+    },
     auth: {
       admin: {
         getUserById: async (id) => {
@@ -141,6 +149,112 @@ test('unverified recipients are skipped and ambiguous provider failures are reco
   await handleOrderEmail(request({ order_id: orderId, status: 'confirmed' }), deps);
   assert.equal(state.sent.length, 1);
 });
+test('admins receive private, independently deduplicated emails even without a verified customer email', async () => {
+  const { state, deps } = fixture();
+  state.user.email_confirmed_at = null;
+  state.admins = [{ user_id: '22222222-2222-4222-8222-222222222222', email: 'admin@example.com' }];
+  const result = await (await handleOrderEmail(request(), deps)).json();
+  assert.equal(result.customer, 'no_verified_email');
+  assert.equal(result.admins.sent, 1);
+  assert.equal(state.sent.length, 1);
+  assert.equal(state.sent[0].to, 'admin@example.com');
+  assert.match(state.sent[0].subject, /^\[Admin\] New order request/);
+  assert.match(state.sent[0].text, new RegExp(`/admin/orders/${orderId}`));
+  assert.equal(state.logs.get(state.sent[0].eventKey).audience, 'admin');
+  await handleOrderEmail(request(), deps);
+  assert.equal(state.sent.length, 1);
+  state.order.status = 'processing';
+  await handleOrderEmail(request({ order_id: orderId, status: 'processing' }), deps);
+  assert.equal(state.sent.length, 2);
+  assert.match(state.sent[1].subject, /Order processing/);
+});
+test('customer and multiple admin outcomes are isolated; retries never resend an accepted email', async () => {
+  const { state, deps } = fixture();
+  state.admins = [
+    { user_id: '22222222-2222-4222-8222-222222222222', email: 'first@example.com' },
+    { user_id: '44444444-4444-4444-8444-444444444444', email: 'second@example.com' },
+  ];
+  state.admins.push(state.admins[0]);
+  deps.send = async (email) => {
+    state.sent.push(email);
+    return email.to === 'first@example.com' ? { error: 'provider_rejected' } : { id: 'accepted' };
+  };
+  const response = await handleOrderEmail(request(), deps);
+  assert.equal(response.status, 503);
+  const body = await response.json();
+  assert.equal(body.customer, 'sent');
+  assert.equal(body.admins.sent, 1);
+  assert.equal(body.admins.failed, 1);
+  assert.equal(state.sent.length, 3);
+  assert.equal(new Set(state.sent.map((email) => email.eventKey)).size, 3);
+  assert.ok(
+    !state.sent
+      .find((email) => email.to === 'customer@example.com')
+      .html.includes('/admin/orders/'),
+  );
+  await handleOrderEmail(request(), deps);
+  assert.equal(state.sent.length, 3);
+});
+test('a malformed admin address does not block another verified recipient', async () => {
+  const { state, deps } = fixture();
+  state.user.email_confirmed_at = null;
+  state.admins = [
+    { user_id: '22222222-2222-4222-8222-222222222222', email: 'invalid' },
+    { user_id: '44444444-4444-4444-8444-444444444444', email: 'admin@example.com' },
+  ];
+  const result = await (await handleOrderEmail(request(), deps)).json();
+  assert.equal(result.admins.sent, 1);
+  assert.equal(result.admins.skipped, 1);
+  assert.deepEqual(
+    state.sent.map((email) => email.to),
+    ['admin@example.com'],
+  );
+});
+test('admin discovery failures preserve customer delivery and can recover without repeating the customer receipt', async () => {
+  const { state, deps } = fixture();
+  state.adminLookupError = true;
+  assert.equal((await handleOrderEmail(request(), deps)).status, 503);
+  assert.equal(state.sent.length, 1);
+  state.adminLookupError = false;
+  state.admins = [{ user_id: '22222222-2222-4222-8222-222222222222', email: 'admin@example.com' }];
+  assert.equal((await handleOrderEmail(request(), deps)).status, 200);
+  assert.equal(state.sent.length, 2);
+  assert.equal(state.sent[1].to, 'admin@example.com');
+});
+test('all delivery stages use audience-specific links, safe content and stored payment status', () => {
+  for (const status of [
+    'awaiting_confirmation',
+    'confirmed',
+    'processing',
+    'shipped',
+    'out_for_delivery',
+    'delivered',
+    'completed',
+    'cancelled',
+  ]) {
+    const order = {
+      ...sample(),
+      status,
+      payment_status: 'unpaid',
+      shipping: { payment_mode: 'cash_on_delivery' },
+      created_at: '2026-11-25T08:30:00Z',
+    };
+    const customer = orderEmail(order);
+    const admin = orderEmail(order, 'admin');
+    assert.match(customer.text, /Payment status: Unpaid/);
+    assert.match(customer.text, /Payment method: Cash on delivery/);
+    assert.match(customer.text, /25 Nov 2026/);
+    assert.match(customer.text, /IST/);
+    assert.match(customer.html, /name="viewport"/);
+    assert.match(customer.html, /role="presentation"/);
+    assert.match(customer.html, /href="https:\/\/dacianastore.in\/account"/);
+    assert.ok(!customer.html.includes('/admin/orders/'));
+    assert.match(admin.html, new RegExp(`/admin/orders/${orderId}`));
+    assert.ok(!admin.html.includes('<script>'));
+  }
+  assert.match(orderEmail({ ...sample(), payment_status: 'paid' }).text, /Payment status: Paid/);
+  assert.match(orderEmail(sample()).text, /Payment status: Not recorded/);
+});
 test('Resend requests use the configured sender, stable idempotency key, escaped HTML and whole rupees', async () => {
   const body = orderEmail(sample());
   assert.match(body.html, /&lt;script&gt;unsafe&lt;\/script&gt; &amp; Cream/);
@@ -198,9 +312,77 @@ test('email SQL protects history and schedules only future inserts or changed st
         "insert into public.storefront_order_requests(user_id,request_key,items,item_total,shipping) values($1,gen_random_uuid(),'[]',100,'{}') returning id",
         [customer],
       );
-    await insert();
+    const historicalId = (await insert()).rows[0].id;
+    // Upgrade a real customer-only history shape, preserving its deduplication key.
+    await db.exec(`create table public.storefront_email_deliveries (
+      id uuid primary key default gen_random_uuid(),event_key text not null unique,
+      order_id uuid references public.storefront_order_requests(id) on delete set null,
+      order_status text not null check(order_status in ('awaiting_confirmation','confirmed','completed','cancelled')),
+      status text not null default 'sending' check(status in ('sending','sent','failed','skipped')),
+      provider_id text,failure_reason text,created_at timestamptz not null default now()
+    )`);
+    await db.query(
+      "insert into public.storefront_email_deliveries(event_key,order_id,order_status,status) values($1,$2,'confirmed','sent')",
+      ['historical-customer-key', historicalId],
+    );
     await db.exec(await sql('order-email-setup.sql'));
     await db.exec(await sql('order-email-setup.sql'));
+    assert.deepEqual(
+      (
+        await db.query(
+          "select event_key,audience,status,recipient_id from public.storefront_email_deliveries where event_key='historical-customer-key'",
+        )
+      ).rows,
+      [
+        {
+          event_key: 'historical-customer-key',
+          audience: 'customer',
+          status: 'sent',
+          recipient_id: null,
+        },
+      ],
+    );
+    await db.query(
+      "update public.storefront_email_deliveries set order_status='processing' where event_key='historical-customer-key'",
+    );
+    await db.exec('set role service_role');
+    assert.deepEqual(
+      (await db.query('select * from public.storefront_order_email_admins()')).rows,
+      [{ user_id: '22222222-2222-4222-8222-222222222222', email: 'luwangtech0@gmail.com' }],
+    );
+    await db.exec('reset role');
+    // Unverified admins and user-editable metadata never grant email access.
+    await db.query('update auth.users set raw_user_meta_data=$2::jsonb where id=$1', [
+      customer,
+      JSON.stringify({ role: 'admin' }),
+    ]);
+    await db.query('update auth.users set email_confirmed_at=null where id=$1', [
+      '22222222-2222-4222-8222-222222222222',
+    ]);
+    assert.equal(
+      (await db.query('select * from public.storefront_order_email_admins()')).rows.length,
+      0,
+    );
+    await db.query('update auth.users set email_confirmed_at=now() where id=$1', [
+      '22222222-2222-4222-8222-222222222222',
+    ]);
+    await db.exec('delete from private.storefront_admins');
+    assert.equal(
+      (await db.query('select * from public.storefront_order_email_admins()')).rows.length,
+      0,
+    );
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`);
+      await assert.rejects(
+        db.query('select * from public.storefront_order_email_admins()'),
+        /permission denied/,
+      );
+      await assert.rejects(
+        db.query('select * from private.storefront_order_email_admins()'),
+        /permission denied/,
+      );
+      await db.exec('reset role');
+    }
     await db.exec(`create schema net;create schema vault;
       create table vault.decrypted_secrets(name text,decrypted_secret text);
       create table net.requests(id bigserial primary key,url text,headers jsonb,body jsonb);
@@ -231,6 +413,10 @@ test('email SQL protects history and schedules only future inserts or changed st
     await db.query("update public.storefront_order_requests set status='confirmed' where id=$1", [
       id,
     ]);
+    await db.query(
+      "update public.storefront_order_requests set payment_status='paid' where id=$1",
+      [id],
+    );
     requests = (await db.query('select * from net.requests')).rows;
     assert.equal(requests.length, 2);
     assert.equal(requests[1].body.status, 'confirmed');

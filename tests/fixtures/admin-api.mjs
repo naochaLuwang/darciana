@@ -4,6 +4,7 @@ import { createDeleteAccountHandler } from '../../supabase/functions/delete-acco
 import { createServer } from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
 import { variantPrice } from '../../src/lib/commerce.ts';
+import { orderTransitions } from '../../src/lib/order-status.ts';
 export const OWNER = '22222222-2222-4222-8222-222222222222';
 export const CUSTOMER = '11111111-1111-4111-8111-111111111111';
 export function tokenFor(id) {
@@ -142,6 +143,8 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
         id: '55555555-5555-4555-8555-555555555555',
         user_id: CUSTOMER,
         status: 'awaiting_confirmation',
+        payment_status: 'unpaid',
+        payment_updated_at: '2026-11-02T12:00:00Z',
         item_total: 299,
         created_at: '2026-11-02T12:00:00Z',
         items: [{ name: 'Rose lip tint', option: 'Standard', quantity: 1, unit_price: 299 }],
@@ -206,6 +209,85 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
         parent_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
         image_url: '',
       });
+      return reply(200, {});
+    }
+    if (path === '/__orders' || path === '/__orders/paged') {
+      const original = structuredClone(orders[0]);
+      const statuses = [
+        'awaiting_confirmation',
+        'confirmed',
+        'processing',
+        'shipped',
+        'out_for_delivery',
+        'delivered',
+        'completed',
+        'cancelled',
+      ];
+      const dates = [
+        '2026-11-01T18:30:00Z',
+        '2026-11-02T04:00:00Z',
+        '2026-11-02T18:29:59.999Z',
+        '2026-11-02T18:30:00Z',
+        '2026-11-03T12:00:00Z',
+        '2026-11-04T12:00:00Z',
+        '2026-11-05T12:00:00Z',
+        '2026-11-02T10:00:00Z',
+      ];
+      orders = statuses.map((status, index) => ({
+        ...structuredClone(original),
+        id: `1111000${index + 1}-5555-4555-8555-555555555555`,
+        status,
+        created_at: dates[index],
+        payment_status: index % 2 === 1 || index === 6 ? 'paid' : 'unpaid',
+        item_total: (index + 1) * 100,
+        order_total: (index + 1) * 100 + 50,
+        shipping_price: 50,
+        shipping: {
+          ...original.shipping,
+          name: [0, 1, 7].includes(index)
+            ? 'Anita Devi'
+            : index === 2
+              ? 'Rina Singh'
+              : `Customer ${index + 1}`,
+          phone: index === 2 ? '9876543222' : '9876543210',
+          payment_mode:
+            index === 6 ? undefined : [2, 5].includes(index) ? 'manual_upi' : 'cash_on_delivery',
+        },
+      }));
+      orders[7].payment_status = 'unpaid';
+      if (path.endsWith('/paged'))
+        for (let index = 0; index < 30; index++)
+          orders.push({
+            ...structuredClone(original),
+            id: `2222${String(index).padStart(4, '0')}-5555-4555-8555-555555555555`,
+            status: 'processing',
+            created_at: `2026-11-06T12:00:${String(index).padStart(2, '0')}Z`,
+            item_total: 100,
+            order_total: 100,
+            shipping_price: 0,
+          });
+      return reply(200, {});
+    }
+    if (path === '/__inventory/categories' || path === '/__inventory/categories/paged') {
+      products[0].category_id = categories[2].id;
+      products[0].product_categories = [];
+      products[1].category_id = categories[1].id;
+      products[1].product_categories = [
+        { category_id: categories[1].id },
+        { category_id: categories[2].id },
+      ];
+      if (path.endsWith('/paged'))
+        for (let index = 0; index < 30; index++) {
+          const id = `7777${String(index).padStart(4, '0')}-5555-4555-8555-555555555555`;
+          products.push({
+            ...structuredClone(products[0]),
+            id,
+            name: `Stationery bundle ${String(index).padStart(2, '0')}`,
+            category_id: categories[1].id,
+            product_categories: [{ category_id: categories[1].id }],
+            product_variants: [{ ...products[0].product_variants[0], id }],
+          });
+        }
       return reply(200, {});
     }
     if (path === '/__gallery') {
@@ -524,6 +606,8 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
           request_key: args.p_request_id,
           created_at: timestamp(),
           status: 'awaiting_confirmation',
+          payment_status: 'unpaid',
+          payment_updated_at: timestamp(),
           item_total: subtotal,
           shipping_area_id: area.id,
           shipping_area_name: area.name,
@@ -593,6 +677,66 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
         areas.push({ ...p, id, updated_at: timestamp() });
         record('shipping_area_saved', id, p.name);
         return reply(200, id);
+      }
+      if (rpc === 'storefront_admin_orders') {
+        const q = (args.p_q ?? '').trim().toLowerCase();
+        const prefix = q.replace(/^#+/, '').replaceAll('-', '');
+        const filtered = orders.filter(
+          (order) =>
+            (!args.p_from || Date.parse(order.created_at) >= Date.parse(args.p_from)) &&
+            (!args.p_to || Date.parse(order.created_at) < Date.parse(args.p_to)) &&
+            (!args.p_payment || order.payment_status === args.p_payment) &&
+            (!args.p_mode ||
+              (args.p_mode === 'unrecorded'
+                ? !order.shipping.payment_mode
+                : order.shipping.payment_mode === args.p_mode)) &&
+            (!q ||
+              order.shipping.name.toLowerCase().includes(q) ||
+              order.shipping.phone.includes(q) ||
+              (prefix && order.id.replaceAll('-', '').startsWith(prefix))),
+        );
+        const summary = { total: filtered.length, pending: 0, order_value: 0, unpaid_value: 0 };
+        const counts = {};
+        for (const order of filtered) {
+          counts[order.status] = (counts[order.status] ?? 0) + 1;
+          if (order.status === 'awaiting_confirmation') summary.pending++;
+          if (order.status !== 'cancelled') {
+            summary.order_value += order.order_total ?? order.item_total;
+            if (order.payment_status === 'unpaid')
+              summary.unpaid_value += order.order_total ?? order.item_total;
+          }
+        }
+        const matching = filtered
+          .filter(
+            (order) =>
+              !args.p_status ||
+              order.status === args.p_status ||
+              (args.p_status === 'active' &&
+                !['awaiting_confirmation', 'cancelled'].includes(order.status)),
+          )
+          .sort((a, b) => {
+            const difference =
+              args.p_sort === 'oldest'
+                ? Date.parse(a.created_at) - Date.parse(b.created_at)
+                : args.p_sort === 'highest_total'
+                  ? (b.order_total ?? b.item_total) - (a.order_total ?? a.item_total)
+                  : args.p_sort === 'lowest_total'
+                    ? (a.order_total ?? a.item_total) - (b.order_total ?? b.item_total)
+                    : 0;
+            return (
+              difference ||
+              Date.parse(b.created_at) - Date.parse(a.created_at) ||
+              a.id.localeCompare(b.id)
+            );
+          });
+        const page = Math.max(1, Math.min(args.p_page ?? 1, Math.ceil(matching.length / 25)));
+        return reply(200, {
+          orders: matching.slice((page - 1) * 25, page * 25),
+          count: matching.length,
+          page,
+          summary,
+          counts,
+        });
       }
       if (rpc === 'storefront_admin_overview')
         return reply(200, {
@@ -674,8 +818,28 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
       if (rpc === 'storefront_admin_set_order_status') {
         const order = orders.find((o) => o.id === args.p_order_id);
         if (order) {
+          if (order.status !== args.p_expected_status)
+            return reply(400, { code: 'P0001', message: 'CONFLICT' });
+          if (!orderTransitions[order.status]?.includes(args.p_status))
+            return reply(400, { code: 'P0001', message: 'INVALID_TRANSITION' });
           order.status = args.p_status;
           record('request_' + order.status, order.id, 'Test request');
+          return reply(200, order.id);
+        }
+      }
+      if (rpc === 'storefront_admin_set_payment_status') {
+        const order = orders.find((o) => o.id === args.p_order_id);
+        if (order) {
+          if (
+            order.payment_status !== args.p_expected_status ||
+            order.payment_updated_at !== args.p_expected_updated_at
+          )
+            return reply(400, { code: 'P0001', message: 'CONFLICT' });
+          if (!['paid', 'unpaid'].includes(args.p_status) || args.p_status === order.payment_status)
+            return reply(400, { code: 'P0001', message: 'INVALID_TRANSITION' });
+          order.payment_status = args.p_status;
+          order.payment_updated_at = timestamp();
+          record('payment_' + order.payment_status, order.id, 'Test request');
           return reply(200, order.id);
         }
       }
@@ -743,7 +907,12 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
                             ? products.flatMap((p) =>
                                 p.product_variants.map((v) => ({
                                   ...v,
-                                  products: { id: p.id, name: p.name, status: p.status },
+                                  products: {
+                                    id: p.id,
+                                    name: p.name,
+                                    status: p.status,
+                                    has_variants: p.has_variants,
+                                  },
                                 })),
                               )
                             : [];
@@ -752,6 +921,30 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
       if (table === 'storefront_order_requests' && user?.id !== OWNER)
         rows = rows.filter((order) => order.user_id === user?.id);
       for (const [key, filter] of url.searchParams) {
+        if (
+          table === 'products' &&
+          key === 'or' &&
+          filter.includes('inventory_category.not.is.null')
+        ) {
+          const ids = filter.match(/category_id\.in\.\(([^)]+)\)/)?.[1].split(',') ?? [];
+          rows = rows.filter(
+            (product) =>
+              ids.includes(product.category_id) ||
+              product.product_categories.some((link) => ids.includes(link.category_id)),
+          );
+          continue;
+        }
+        if (table === 'products' && key === 'product_variants.stock' && filter.startsWith('lte.')) {
+          rows = rows
+            .map((product) => ({
+              ...product,
+              product_variants: product.product_variants.filter(
+                (variant) => variant.stock <= Number(filter.slice(4)),
+              ),
+            }))
+            .filter((product) => product.product_variants.length);
+          continue;
+        }
         if (filter.startsWith('eq.'))
           rows = rows.filter(
             (r) =>
@@ -761,7 +954,7 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
           rows = rows.filter((r) => Number(r[key]) <= Number(filter.slice(4)));
         if (filter.startsWith('ilike.'))
           rows = rows.filter((r) =>
-            String(r[key])
+            String(key === 'products.name' ? r.products?.name : r[key])
               .toLowerCase()
               .includes(filter.slice(6).replaceAll('%', '').toLowerCase()),
           );

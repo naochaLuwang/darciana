@@ -27,6 +27,7 @@ export default defineConfig({
         NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54329',
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'test-publishable-key',
         SUPABASE_SECRET_KEY: 'test-server-secret',
+        FIREBASE_SERVICE_ACCOUNT_BASE64: '',
       },
       reuseExistingServer: false,
       timeout: 120000,

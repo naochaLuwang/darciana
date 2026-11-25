@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Capacitor } from '@capacitor/core';
 import { Bell } from 'lucide-react';
 import { useSession } from './session';
-import { disablePush, enablePush, getPushPreferences } from './push';
+import { disablePush, enablePush, getPushPreferences, supportsPush } from './push';
 
 export function PushSettings() {
   const { user } = useSession();
@@ -30,7 +29,7 @@ export function PushSettings() {
       window.removeEventListener('daciana:push-changed', update);
     };
   }, [user?.id]);
-  if (Capacitor.getPlatform() !== 'android') return null;
+  if (!supportsPush()) return null;
   async function change(next: boolean, offers: boolean) {
     setPending(true);
     setError('');

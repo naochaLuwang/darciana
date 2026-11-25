@@ -32,8 +32,24 @@ export function AdminNotice({ children }: { children: React.ReactNode }) {
   );
 }
 export function StatusBadge({ status, children }: { status: string; children?: React.ReactNode }) {
-  const positive = ['active', 'completed', 'confirmed', 'sent', 'in_stock'].includes(status);
-  const warning = ['awaiting_confirmation', 'low', 'pending'].includes(status);
+  const positive = [
+    'active',
+    'completed',
+    'confirmed',
+    'delivered',
+    'paid',
+    'sent',
+    'in_stock',
+  ].includes(status);
+  const warning = [
+    'awaiting_confirmation',
+    'processing',
+    'shipped',
+    'out_for_delivery',
+    'unpaid',
+    'low',
+    'pending',
+  ].includes(status);
   const negative = ['cancelled', 'failed', 'out_of_stock'].includes(status);
   return (
     <Badge

@@ -12,6 +12,8 @@ export type AdminOrder = {
   user_id: string;
   created_at: string;
   status: string;
+  payment_status: 'unpaid' | 'paid';
+  payment_updated_at: string;
   item_total: number;
   shipping_area_name: string | null;
   shipping_price: number | null;
@@ -76,6 +78,8 @@ export function adminError(error: { code?: string; message?: string } | null) {
     return 'Your admin access has changed. Sign in again or contact the owner.';
   if (error.message?.includes('CONFLICT'))
     return 'Someone changed this record. Refresh the page before saving again.';
+  if (error.message?.includes('INVALID_TRANSITION'))
+    return 'This status change is no longer available. Refresh the order and choose its next stage.';
   if (error.message?.includes('CATEGORY_CYCLE'))
     return 'That parent would create a category loop. Choose another parent.';
   if (error.message?.includes('EXISTING_VARIANTS_REQUIRED'))

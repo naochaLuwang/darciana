@@ -86,3 +86,20 @@ body {
   font-size: 13px;
   color: #766b63;
 }
+
+.apple-sign-in-form {
+  margin-bottom: 12px;
+}
+.apple-sign-in {
+  width: 100%;
+  min-height: 48px;
+  background: #000;
+  color: #fff;
+  border: 1px solid #000;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 600;
+}
+.apple-sign-in:hover:not(:disabled) {
+  background: #222;
+  color: #fff;
+}

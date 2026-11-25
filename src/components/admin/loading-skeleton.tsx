@@ -49,6 +49,17 @@ export function AdminScreenSkeleton({ screen }: { screen: AdminSkeletonScreen })
         </div>
         {table ? (
           <>
+            {screen === 'orders' && (
+              <div className="admin-orders-metrics">
+                {[0, 1, 2, 3].map((index) => (
+                  <div key={index} className="space-y-4">
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-7 w-20" />
+                    <Skeleton className="h-3 w-full" />
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex gap-3">
               <Skeleton className="h-9 w-64" />
               <Skeleton className="h-9 w-24" />

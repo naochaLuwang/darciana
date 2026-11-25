@@ -38,6 +38,10 @@ async function choose(page: import('@playwright/test').Page, label: string, opti
   await page.getByRole('combobox', { name: label, exact: true }).click();
   await page.getByRole('option', { name: option, exact: true }).click();
 }
+async function openOrderFilters(page: import('@playwright/test').Page) {
+  const button = page.getByRole('button', { name: /^Filters(?:,|$)/ });
+  if ((await button.getAttribute('aria-expanded')) !== 'true') await button.click();
+}
 test.beforeEach(async ({ request }) => {
   await request.get('http://127.0.0.1:54329/__reset');
 });
@@ -279,6 +283,281 @@ test('signed-out and customer accounts cannot see admin data', async ({ page, co
   await expect(page.getByText('Rose lip tint')).toHaveCount(0);
   await expect(page.getByRole('navigation', { name: 'Admin navigation' })).toHaveCount(0);
 });
+test('inventory groups variant sub-rows and searches product names on desktop and mobile', async ({
+  page,
+  context,
+  request,
+}) => {
+  await request.get('http://127.0.0.1:54329/__gallery');
+  await signIn(context, OWNER);
+  await page.goto('/admin/inventory');
+  const table = page.getByRole('table', { name: 'Product inventory' });
+  await expect(table.getByRole('columnheader', { name: /SKU/ })).toHaveCount(0);
+  await expect(table).not.toContainText('ROSE-01');
+  const simple = table.getByRole('row').filter({ hasText: 'Rose lip tint' });
+  await expect(simple.locator('.admin-inventory-name small')).toHaveCount(0);
+  await expect(table.getByRole('link', { name: 'Colour pencil set', exact: true })).toHaveCount(1);
+  for (const title of ['Rose', 'Mint', 'Sand']) {
+    const variant = table.getByRole('row', { name: `Colour pencil set — ${title}`, exact: true });
+    await expect(variant.locator('.admin-inventory-variant-name')).toHaveText(title);
+    await expect(variant).not.toContainText('Colour pencil set');
+  }
+  await page.screenshot({ path: 'artifacts/inventory-desktop.png', fullPage: true });
+
+  const search = page.getByRole('searchbox', { name: 'Search product names' });
+  await search.fill('COLOUR pencil');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(table.getByRole('row')).toHaveCount(5);
+  await expect(table).not.toContainText('Rose lip tint');
+  const mint = table.getByRole('row').filter({ hasText: 'Mint' });
+  await mint.getByLabel('Stock quantity').fill('12');
+  await mint.getByRole('button', { name: 'Save stock' }).click();
+  await expect(mint.getByRole('status')).toHaveText('Saved');
+  await expect(mint).toContainText('In stock');
+  const response = await request.get('http://127.0.0.1:54329/rest/v1/products', {
+    headers: { Authorization: `Bearer ${tokenFor(OWNER)}` },
+  });
+  const products = (await response.json()) as {
+    name: string;
+    product_variants: { title: string; stock: number }[];
+  }[];
+  expect(
+    products
+      .find((product) => product.name === 'Colour pencil set')
+      ?.product_variants.map(({ title, stock }) => ({ title, stock })),
+  ).toEqual([
+    { title: 'Rose', stock: 4 },
+    { title: 'Mint', stock: 12 },
+    { title: 'Sand', stock: 0 },
+  ]);
+
+  await page.getByRole('checkbox', { name: 'Low stock only (5 or fewer)' }).check();
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(table.getByRole('row')).toHaveCount(4);
+  await expect(table).not.toContainText('Mint');
+  await page.setViewportSize({ width: 393, height: 852 });
+  await expect(table.getByRole('row').filter({ hasText: 'Sand' })).toContainText('Out of stock');
+  await expect(table.getByLabel('Stock quantity').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save stock' }).first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.screenshot({ path: 'artifacts/inventory-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 320, height: 720 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+
+  await page.getByRole('link', { name: 'Clear filters' }).click();
+  await search.fill('rose');
+  await search.press('Enter');
+  await expect(table.getByRole('row')).toHaveCount(2);
+  await expect(table).toContainText('Rose lip tint');
+  await expect(table).not.toContainText('Colour pencil set');
+  await search.fill('ROSE-01');
+  await search.press('Enter');
+  await expect(page.getByRole('heading', { name: 'No matching inventory' })).toBeVisible();
+  await page.getByRole('link', { name: 'Clear filters' }).click();
+  await expect(table.getByRole('row')).toHaveCount(6);
+});
+
+test('inventory filters category trees, additional category assignments and paginated low-stock searches', async ({
+  page,
+  context,
+  request,
+}) => {
+  await request.get('http://127.0.0.1:54329/__gallery');
+  await request.get('http://127.0.0.1:54329/__inventory/categories');
+  await signIn(context, OWNER);
+  await page.goto('/admin/inventory');
+  const category = page.getByRole('combobox', { name: 'Filter by category', exact: true });
+  const table = page.getByRole('table', { name: 'Product inventory' });
+  const apply = page.getByRole('button', { name: 'Search', exact: true });
+  await expect(category).toContainText('Cosmetics / Lip colour');
+  await page.getByRole('checkbox', { name: 'Select all rows on this page', exact: true }).check();
+  await category.selectOption('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+  await apply.click();
+  await expect(table).toContainText('Colour pencil set');
+  await expect(table).not.toContainText('Rose lip tint');
+  await expect(page.getByRole('button', { name: 'Update selected' })).toHaveCount(0);
+  await category.selectOption('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  await apply.click();
+  await expect(table).toContainText('Rose lip tint');
+  await expect(table).toContainText('Colour pencil set');
+  await category.selectOption('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+  await apply.click();
+  await expect(table).toContainText('Rose lip tint');
+  await expect(table).toContainText('Colour pencil set');
+  await page.getByRole('searchbox', { name: 'Search product names' }).fill('Colour');
+  await page.getByRole('checkbox', { name: 'Low stock only (5 or fewer)' }).check();
+  await apply.click();
+  await expect(table.getByRole('row')).toHaveCount(5);
+  await expect(table).not.toContainText('Rose lip tint');
+  await expect(category).toHaveValue('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+  await page.screenshot({ path: 'artifacts/inventory-category-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 320, height: 720 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.getByRole('link', { name: 'Clear filters', exact: true }).click();
+  await expect(category).toHaveValue('');
+  await expect(table.getByRole('row')).toHaveCount(6);
+  await request.get('http://127.0.0.1:54329/__inventory/categories/paged');
+  await page.goto(
+    '/admin/inventory?category=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb&q=Stationery&low=true',
+  );
+  await expect(table.getByRole('row')).toHaveCount(26);
+  await page.getByRole('link', { name: 'Next', exact: true }).click();
+  await expect(page).toHaveURL(/category=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/);
+  await expect(page).toHaveURL(/q=Stationery/);
+  await expect(page).toHaveURL(/low=true/);
+  await expect(table.getByRole('row')).toHaveCount(6);
+  await expect(category).toHaveValue('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+});
+
+test('inventory selects products or individual variants and bulk sets only selected stock', async ({
+  page,
+  context,
+  request,
+}) => {
+  await request.get('http://127.0.0.1:54329/__gallery');
+  await signIn(context, OWNER);
+  await page.goto('/admin/inventory');
+  const group = page.getByRole('checkbox', {
+    name: 'Select all variants of Colour pencil set',
+    exact: true,
+  });
+  const mint = page.getByRole('checkbox', { name: 'Select Colour pencil set — Mint', exact: true });
+  const all = page.getByRole('checkbox', { name: 'Select all rows on this page', exact: true });
+  await group.check();
+  await expect(page.getByText('3 selected', { exact: true })).toBeVisible();
+  await expect(all).toHaveAttribute('aria-checked', 'mixed');
+  await mint.uncheck();
+  await expect(group).toHaveAttribute('aria-checked', 'mixed');
+  await expect(page.getByText('2 selected', { exact: true })).toBeVisible();
+  await all.check();
+  await expect(page.getByText('4 selected', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Clear selection' }).click();
+  await expect(page.getByRole('button', { name: 'Update selected' })).toHaveCount(0);
+  await group.check();
+  await page.getByLabel('Set stock to').fill('7');
+  await page.screenshot({ path: 'artifacts/inventory-bulk-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 320, height: 720 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.setViewportSize({ width: 393, height: 852 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.screenshot({ path: 'artifacts/inventory-bulk-mobile.png', fullPage: true });
+  await page.getByRole('button', { name: 'Update selected', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Updated stock for' })).toHaveText(
+    'Updated stock for 3 rows.',
+  );
+  for (const title of ['Rose', 'Mint', 'Sand'])
+    await expect(
+      page
+        .getByRole('row', { name: `Colour pencil set — ${title}`, exact: true })
+        .getByLabel('Stock quantity'),
+    ).toHaveValue('7');
+  await expect(
+    page.getByRole('row', { name: 'Rose lip tint', exact: true }).getByLabel('Stock quantity'),
+  ).toHaveValue('4');
+  await expect(group).not.toBeChecked();
+  const response = await request.get('http://127.0.0.1:54329/rest/v1/products', {
+    headers: { Authorization: `Bearer ${tokenFor(OWNER)}` },
+  });
+  const products = await response.json();
+  expect(
+    products
+      .find((product: { name: string }) => product.name === 'Colour pencil set')
+      .product_variants.map((variant: { stock: number }) => variant.stock),
+  ).toEqual([7, 7, 7]);
+
+  await page
+    .getByRole('checkbox', { name: 'Select Colour pencil set — Sand', exact: true })
+    .check();
+  await page.getByLabel('Set stock to').fill('0');
+  await page.getByRole('button', { name: 'Update selected', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Updated stock for' })).toHaveText(
+    'Updated stock for 1 row.',
+  );
+  await expect(
+    page.getByRole('row', { name: 'Colour pencil set — Sand', exact: true }),
+  ).toContainText('Out of stock');
+  await expect(
+    page
+      .getByRole('row', { name: 'Colour pencil set — Mint', exact: true })
+      .getByLabel('Stock quantity'),
+  ).toHaveValue('7');
+  await all.check();
+  await page.getByRole('searchbox', { name: 'Search product names' }).fill('rose');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Update selected' })).toHaveCount(0);
+  await expect(all).not.toBeChecked();
+});
+
+test('inventory bulk updates report conflicts without overwriting newer stock', async ({
+  page,
+  context,
+  request,
+}) => {
+  await request.get('http://127.0.0.1:54329/__gallery');
+  await signIn(context, OWNER);
+  await page.goto('/admin/inventory');
+  await page
+    .getByRole('checkbox', { name: 'Select all variants of Colour pencil set', exact: true })
+    .check();
+  const changed = await request.post(
+    'http://127.0.0.1:54329/rest/v1/rpc/storefront_admin_set_stock',
+    {
+      headers: { Authorization: `Bearer ${tokenFor(OWNER)}` },
+      data: {
+        p_variant_id: '99999999-9999-4999-8999-999999999992',
+        p_stock: 19,
+        p_expected_updated_at: '2026-11-01T12:00:00Z',
+      },
+    },
+  );
+  expect(changed.ok()).toBe(true);
+  await page.getByLabel('Set stock to').fill('6');
+  await page.getByRole('button', { name: 'Update selected', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Updated stock for' })).toHaveText(
+    'Updated stock for 2 rows.',
+  );
+  await expect(page.locator('.admin-inventory').getByRole('alert')).toContainText(
+    '1 row was not updated',
+  );
+  await expect(page.locator('.admin-inventory').getByRole('alert')).toContainText(
+    'Colour pencil set — Mint',
+  );
+  await expect(page.locator('.admin-inventory').getByRole('alert')).toContainText(
+    'Someone changed this record',
+  );
+  await expect(page.getByText('1 selected', { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('checkbox', { name: 'Select Colour pencil set — Mint', exact: true }),
+  ).toBeChecked();
+  await expect(
+    page.getByRole('checkbox', { name: 'Select Colour pencil set — Rose', exact: true }),
+  ).not.toBeChecked();
+  await expect(
+    page
+      .getByRole('row', { name: 'Colour pencil set — Mint', exact: true })
+      .getByLabel('Stock quantity'),
+  ).toHaveValue('19');
+  const response = await request.get('http://127.0.0.1:54329/rest/v1/products', {
+    headers: { Authorization: `Bearer ${tokenFor(OWNER)}` },
+  });
+  const products = await response.json();
+  expect(
+    products
+      .find((product: { name: string }) => product.name === 'Colour pencil set')
+      .product_variants.map((variant: { stock: number }) => variant.stock),
+  ).toEqual([6, 19, 6]);
+});
+
 test('owner can manage products, categories, stock and request status', async ({
   page,
   context,
@@ -333,7 +612,7 @@ test('owner can manage products, categories, stock and request status', async ({
     .getByRole('navigation', { name: 'Admin navigation' })
     .getByRole('link', { name: 'Inventory', exact: true })
     .click();
-  const row = page.getByRole('row').filter({ hasText: 'ROSE-01' });
+  const row = page.getByRole('row').filter({ hasText: 'Rose lip tint' });
   await row.getByLabel('Stock quantity').fill('12');
   await row.getByRole('button', { name: 'Save stock' }).click();
   await expect(row.getByRole('status')).toHaveText('Saved');
@@ -342,11 +621,319 @@ test('owner can manage products, categories, stock and request status', async ({
     .getByRole('link', { name: 'Order requests', exact: true })
     .click();
   await page.getByRole('link', { name: 'Review →' }).click();
-  await choose(page, 'Move request to', 'Confirmed');
-  await page.getByLabel('I’ve reviewed this request and want to mark it confirmed.').check();
-  await page.getByRole('button', { name: 'Update status' }).click();
-  await expect(page.locator('.admin-panel-heading .admin-status')).toHaveText('confirmed');
+  await choose(page, 'Delivery status', 'Processing');
+  await expect(page.locator('.admin-panel-heading .admin-status')).toHaveText('Processing');
 });
+test('orders move through delivery stages, keep payment separate and notify automatically', async ({
+  page,
+  context,
+  request,
+}) => {
+  await signIn(context, OWNER);
+  const orderId = '55555555-5555-4555-8555-555555555555';
+  await page.goto(`/admin/orders/${orderId}`);
+  const statusBadge = page.locator('.admin-panel-heading .admin-status');
+  const payment = page.getByRole('group', { name: 'Update payment status' });
+  await expect(statusBadge).toHaveText('Request received');
+  await expect(payment.locator('.admin-status')).toHaveText('Unpaid');
+  await expect(page.getByRole('button', { name: /Update payment|Update status/ })).toHaveCount(0);
+  await expect(
+    page.getByText('Cancellation is available only before shipping.', { exact: false }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Send the customer a push notification.')).toHaveCount(0);
+  await page.screenshot({ path: 'artifacts/order-fulfilment-desktop.png', fullPage: true });
+  const dropdown = page.getByRole('combobox', { name: 'Delivery status', exact: true });
+  async function checkOptions(current: string, next?: string, cancellable = false) {
+    await dropdown.click();
+    for (const label of [
+      'Request received',
+      'Processing',
+      'Shipped',
+      'Out for delivery',
+      'Delivered',
+      'Cancelled',
+    ]) {
+      const option = page.getByRole('option', { name: label, exact: true });
+      if (label === current || label === next || (label === 'Cancelled' && cancellable))
+        await expect(option).toBeEnabled();
+      else await expect(option).toBeDisabled();
+    }
+    await page.keyboard.press('Escape');
+  }
+  await checkOptions('Request received', 'Processing', true);
+  let writes = 0;
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().includes(`/admin/orders/${orderId}`)) writes++;
+  });
+  await choose(page, 'Delivery status', 'Request received');
+  expect(writes).toBe(0);
+  let current = 'Request received';
+  for (const stage of ['Processing', 'Shipped', 'Out for delivery', 'Delivered']) {
+    await checkOptions(current, stage, current === 'Request received' || current === 'Processing');
+    await choose(page, 'Delivery status', stage);
+    await expect(statusBadge).toHaveText(stage);
+    await expect(page.getByRole('status').filter({ hasText: 'Status saved.' })).toBeVisible();
+    await expect(payment.locator('.admin-status')).toHaveText('Unpaid');
+    current = stage;
+  }
+  await checkOptions('Delivered');
+  expect(writes).toBe(4);
+  await expect(page.getByRole('combobox', { name: 'Delivery status', exact: true })).toHaveText(
+    'Delivered',
+  );
+  await expect(
+    page.getByText('This order is delivered. No further delivery changes are available.'),
+  ).toBeVisible();
+  await choose(page, 'Mark payment as', 'Paid');
+  await expect(payment.locator('.admin-status')).toHaveText('Paid');
+  await expect(payment.getByRole('status')).toHaveText('Payment status saved.');
+  await expect(statusBadge).toHaveText('Delivered');
+  await page.reload();
+  await expect(payment.locator('.admin-status')).toHaveText('Paid');
+  await page.setViewportSize({ width: 393, height: 852 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.screenshot({ path: 'artifacts/order-fulfilment-mobile.png', fullPage: true });
+  await choose(page, 'Mark payment as', 'Unpaid');
+  await expect(payment.locator('.admin-status')).toHaveText('Unpaid');
+  await expect(statusBadge).toHaveText('Delivered');
+  const response = await request.get('http://127.0.0.1:54329/rest/v1/storefront_order_requests', {
+    headers: { Authorization: `Bearer ${tokenFor(OWNER)}` },
+  });
+  expect(await response.json()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ status: 'delivered', payment_status: 'unpaid', item_total: 299 }),
+    ]),
+  );
+  await page.goto('/admin/orders?status=delivered');
+  const row = page.getByRole('row').filter({ hasText: '#55555555' });
+  await expect(row).toContainText('Delivered');
+  await expect(row).toContainText('Unpaid');
+  await context.clearCookies();
+  await signIn(context, CUSTOMER);
+  await page.goto('/account');
+  await expect(page.locator('.account-orders .order-status')).toHaveText('Delivered');
+  await expect(page.locator('.account-orders')).toContainText('Payment status');
+  await expect(page.locator('.account-orders')).toContainText('Unpaid');
+});
+
+test('order and payment changes reject stale edits and cancelled orders remain terminal', async ({
+  page,
+  context,
+  request,
+}) => {
+  await signIn(context, OWNER);
+  const orderId = '55555555-5555-4555-8555-555555555555';
+  await page.goto(`/admin/orders/${orderId}`);
+  const response = await request.post(
+    'http://127.0.0.1:54329/rest/v1/rpc/storefront_admin_set_order_status',
+    {
+      headers: { Authorization: `Bearer ${tokenFor(OWNER)}` },
+      data: {
+        p_order_id: orderId,
+        p_status: 'processing',
+        p_expected_status: 'awaiting_confirmation',
+      },
+    },
+  );
+  expect(response.ok()).toBe(true);
+  await choose(page, 'Delivery status', 'Processing');
+  await expect(page.locator('.admin-order-status-form').getByRole('alert')).toContainText(
+    'Someone changed this record',
+  );
+  await expect(page.getByRole('combobox', { name: 'Delivery status', exact: true })).toHaveText(
+    'Request received',
+  );
+  await page.reload();
+  await choose(page, 'Delivery status', 'Cancelled');
+  await expect(page.locator('.admin-panel-heading .admin-status')).toHaveText('Cancelled');
+  await expect(page.getByRole('combobox', { name: 'Delivery status', exact: true })).toHaveText(
+    'Cancelled',
+  );
+  await page.getByRole('combobox', { name: 'Delivery status', exact: true }).click();
+  await expect(page.getByRole('option', { name: 'Cancelled', exact: true })).toBeEnabled();
+  await expect(page.getByRole('option', { name: 'Processing', exact: true })).toBeDisabled();
+  await page.keyboard.press('Escape');
+  const paid = await request.post(
+    'http://127.0.0.1:54329/rest/v1/rpc/storefront_admin_set_payment_status',
+    {
+      headers: { Authorization: `Bearer ${tokenFor(OWNER)}` },
+      data: {
+        p_order_id: orderId,
+        p_status: 'paid',
+        p_expected_status: 'unpaid',
+        p_expected_updated_at: '2026-11-02T12:00:00Z',
+      },
+    },
+  );
+  expect(paid.ok()).toBe(true);
+  await choose(page, 'Mark payment as', 'Paid');
+  const payment = page.getByRole('group', { name: 'Update payment status' });
+  await expect(payment.getByRole('alert')).toContainText('Someone changed this record');
+  await page.reload();
+  await expect(payment.locator('.admin-status')).toHaveText('Paid');
+});
+
+test('orders dashboard uses three tabs and filters individual statuses within Active', async ({
+  page,
+  context,
+  request,
+}) => {
+  await request.get('http://127.0.0.1:54329/__orders');
+  await signIn(context, OWNER);
+  await page.goto('/admin/orders');
+  const table = page.getByRole('table', { name: 'Order requests', exact: true });
+  const tabs = page.getByRole('navigation', { name: 'Order statuses' });
+  const tab = (name: string) => tabs.getByRole('link', { name: new RegExp(`^${name},`) });
+  const metric = (label: string) =>
+    page
+      .locator('.admin-orders-metrics > div')
+      .filter({ has: page.getByText(label, { exact: true }) })
+      .locator('dd');
+  const switchTab = async (name: string, rows: number) => {
+    await tab(name).click();
+    await expect(tab(name)).toHaveAttribute('aria-current', 'page');
+    await expect(table.getByRole('row')).toHaveCount(rows);
+  };
+  await expect(tabs.getByRole('link')).toHaveCount(3);
+  await expect(tab('Pending')).toHaveAttribute('aria-current', 'page');
+  await expect(tab('Pending').locator('span')).toHaveText('1');
+  await expect(tab('Active').locator('span')).toHaveText('6');
+  await expect(tab('Cancelled').locator('span')).toHaveText('1');
+  await expect(metric('Total orders')).toHaveText('8');
+  await expect(metric('Pending orders')).toHaveText('1');
+  await expect(metric('Order value')).toHaveText('₹3,150');
+  await expect(metric('Unpaid value')).toHaveText('₹1,050');
+  await expect(table.getByRole('row')).toHaveCount(2);
+  await expect(table).toContainText('#11110001');
+  await expect(page.getByRole('button', { name: 'Filters', exact: true })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
+  await expect(page.getByLabel('From date', { exact: true })).not.toBeVisible();
+  await page.screenshot({ path: 'artifacts/orders-dashboard-desktop.png', fullPage: true });
+  await switchTab('Active', 7);
+  await expect(table).not.toContainText('#11110001');
+  await expect(table).not.toContainText('#11110008');
+  const status = page.getByLabel('Active status', { exact: true });
+  await status.selectOption('confirmed');
+  await page.getByRole('button', { name: 'Apply filters', exact: true }).click();
+  await expect(table.getByRole('row')).toHaveCount(2);
+  await expect(table).toContainText('#11110002');
+  await expect(tab('Active')).toHaveAttribute('aria-current', 'page');
+  await status.selectOption('');
+  await page.getByRole('button', { name: 'Apply filters', exact: true }).click();
+  await expect(table.getByRole('row')).toHaveCount(7);
+  await switchTab('Cancelled', 2);
+  await expect(table).toContainText('#11110008');
+  await expect(status).toHaveCount(0);
+  await switchTab('Active', 7);
+  await openOrderFilters(page);
+  await page.getByLabel('From date', { exact: true }).fill('2026-11-02');
+  await page.getByLabel('To date', { exact: true }).fill('2026-11-02');
+  await page.getByRole('button', { name: 'Filters', exact: true }).click();
+  await expect(page.getByLabel('From date', { exact: true })).not.toBeVisible();
+  await page.getByRole('button', { name: 'Apply filters', exact: true }).click();
+  await expect(metric('Total orders')).toHaveText('4');
+  await expect(metric('Order value')).toHaveText('₹750');
+  await expect(table.getByRole('row')).toHaveCount(3);
+  await expect(table).toContainText('#11110002');
+  await expect(table).toContainText('#11110003');
+  await expect(table).not.toContainText('#11110004');
+  await switchTab('Pending', 2);
+  await openOrderFilters(page);
+  await page.getByLabel('Payment status', { exact: true }).selectOption('unpaid');
+  await page.getByLabel('Payment mode', { exact: true }).selectOption('cash_on_delivery');
+  await page.getByRole('searchbox', { name: 'Find an order' }).fill('Anita');
+  await page.getByLabel('Sort orders', { exact: true }).selectOption('lowest_total');
+  await page.getByRole('button', { name: 'Apply filters', exact: true }).click();
+  await expect(table.getByRole('row')).toHaveCount(2);
+  await expect(metric('Total orders')).toHaveText('2');
+  await expect(metric('Order value')).toHaveText('₹150');
+  await expect(metric('Unpaid value')).toHaveText('₹150');
+  await switchTab('Cancelled', 2);
+  await expect(table).toContainText('#11110008');
+  await expect(page).toHaveURL(/from=2026-11-02/);
+  await expect(page).toHaveURL(/payment=unpaid/);
+  await expect(page.getByRole('searchbox', { name: 'Find an order' })).toHaveValue('Anita');
+  await expect(tab('Pending').locator('span')).toHaveText('1');
+  await expect(tab('Active').locator('span')).toHaveText('0');
+  await page.getByRole('link', { name: 'Clear filters', exact: true }).click();
+  await expect(metric('Total orders')).toHaveText('8');
+  await expect(tab('Cancelled')).toHaveAttribute('aria-current', 'page');
+  await switchTab('Active', 7);
+  await page.getByRole('searchbox', { name: 'Find an order' }).fill('#11110003');
+  await page.getByRole('button', { name: 'Apply filters', exact: true }).click();
+  await expect(table.getByRole('row')).toHaveCount(2);
+  await expect(table).toContainText('Rina Singh');
+  await page.getByRole('searchbox', { name: 'Find an order' }).fill('9876543222');
+  await page.getByRole('button', { name: 'Apply filters', exact: true }).click();
+  await expect(table.getByRole('row')).toHaveCount(2);
+  await page.getByRole('searchbox', { name: 'Find an order' }).fill('No such customer');
+  await page.getByRole('button', { name: 'Apply filters', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'No orders match these filters' })).toBeVisible();
+  await expect(metric('Total orders')).toHaveText('0');
+  await page.getByRole('link', { name: 'Clear filters', exact: true }).click();
+  await expect(metric('Total orders')).toHaveText('8');
+  await openOrderFilters(page);
+  await page.getByLabel('From date', { exact: true }).fill('2026-11-03');
+  await page.getByLabel('To date', { exact: true }).fill('2026-11-02');
+  await page.getByRole('button', { name: 'Apply filters', exact: true }).click();
+  await expect(page.getByText('The end date must be on or after the start date.')).toBeVisible();
+  await page.getByRole('link', { name: 'Clear filters', exact: true }).click();
+  await expect(metric('Total orders')).toHaveText('8');
+  await expect(table.getByRole('row')).toHaveCount(7);
+  await page.setViewportSize({ width: 393, height: 852 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.screenshot({ path: 'artifacts/orders-dashboard-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 320, height: 720 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
+test('orders dashboard paginates without changing metrics and keeps filter choices in navigation', async ({
+  page,
+  context,
+  request,
+}) => {
+  await request.get('http://127.0.0.1:54329/__orders/paged');
+  await signIn(context, OWNER);
+  await page.goto('/admin/orders?tab=active&sort=oldest');
+  const table = page.getByRole('table', { name: 'Order requests', exact: true });
+  await expect(table.getByRole('row')).toHaveCount(26);
+  await expect(page.locator('.admin-orders-metrics > div').first().locator('dd')).toHaveText('38');
+  await expect(page.locator('.admin-orders-metrics')).toContainText('₹6,150');
+  await page.getByRole('link', { name: 'Next', exact: true }).click();
+  await expect(page).toHaveURL(/sort=oldest/);
+  await expect(table.getByRole('row')).toHaveCount(12);
+  await expect(page.locator('.admin-orders-metrics > div').first().locator('dd')).toHaveText('38');
+  await page
+    .getByRole('navigation', { name: 'Order statuses' })
+    .getByRole('link', { name: /^Pending/ })
+    .click();
+  await expect(page).not.toHaveURL(/page=2/);
+  await expect(table.getByRole('row')).toHaveCount(2);
+  await expect(page.getByText('1 records · Page 1 of 1')).toBeVisible();
+  await openOrderFilters(page);
+  await page
+    .getByRole('navigation', { name: 'Order date ranges' })
+    .getByRole('link', { name: 'Last 7 days', exact: true })
+    .click();
+  await expect(page).toHaveURL(/tab=pending/);
+  await expect(page).toHaveURL(/from=/);
+  await expect(page).toHaveURL(/to=/);
+  await openOrderFilters(page);
+  await page
+    .getByRole('navigation', { name: 'Order date ranges' })
+    .getByRole('link', { name: 'All time', exact: true })
+    .click();
+  await expect(table.getByRole('row')).toHaveCount(2);
+});
+
 test('admin navigation and editor work on a phone', async ({ page, context }) => {
   await signIn(context, OWNER);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -938,7 +1525,7 @@ test('shadcn sidebar, account menu and history tabs work without losing admin ac
   await expect(page.getByRole('navigation', { name: 'Admin navigation' })).toHaveCount(0);
 });
 
-test('Prices keeps the list compact and saves whole-rupee discounts in the editor', async ({
+test('Prices uses inline whole-rupee pricing and preserves product details', async ({
   page,
   context,
   request,
@@ -952,29 +1539,14 @@ test('Prices keeps the list compact and saves whole-rupee discounts in the edito
   ).toBeVisible();
   await context.clearCookies();
   await signIn(context, OWNER);
-  await page.goto('/admin');
-  await page
-    .getByRole('navigation', { name: 'Admin navigation' })
-    .getByRole('link', { name: 'Prices', exact: true })
-    .click();
-  const row = page.getByRole('article', { name: 'Rose lip tint', exact: true });
-  const editor = page.getByRole('dialog', { name: 'Rose lip tint', exact: true });
-  const open = async () => {
-    await row.getByRole('button', { name: 'Edit prices for Rose lip tint', exact: true }).click();
-    await expect(editor).toBeVisible();
-  };
-  const save = async () => {
-    await editor.getByRole('button', { name: 'Save changes', exact: true }).click();
-    await expect(editor).toHaveCount(0);
-    await expect(row.getByRole('status')).toHaveText('Saved');
-  };
-  await expect(row).toContainText('₹299');
-  await expect(page.getByLabel('Price (₹)', { exact: true })).toHaveCount(0);
-  await open();
-  const price = editor.getByLabel('Price (₹)', { exact: true });
-  const original = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
+  await page.goto('/admin/prices');
+  const table = page.getByRole('table', { name: 'Product prices' });
+  const row = table.getByRole('row', { name: 'Rose lip tint', exact: true });
+  await expect(table.getByRole('columnheader', { name: /SKU/ })).toHaveCount(0);
+  const price = row.getByLabel('Price (₹)', { exact: true });
   await expect(price).toHaveValue('399');
-  await expect(editor.locator('output')).toHaveText('₹299');
+  await expect(row.getByLabel('Selling price', { exact: true })).toHaveText('₹299');
+  const original = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
   await price.fill('0');
   await price.press('Backspace');
   await price.blur();
@@ -982,12 +1554,12 @@ test('Prices keeps the list compact and saves whole-rupee discounts in the edito
   await price.fill('499.5');
   await price.blur();
   await expect(price).toHaveValue('500');
-  await editor.getByLabel('Discount (₹)', { exact: true }).fill('49.5');
-  await editor.getByLabel('Discount (₹)', { exact: true }).blur();
-  await expect(editor.getByLabel('Discount (₹)', { exact: true })).toHaveValue('50');
-  await expect(editor.locator('output')).toHaveText('₹450');
-  await save();
-  await expect(row).toContainText('₹450');
+  await row.getByLabel('Discount (₹)', { exact: true }).fill('49.5');
+  await row.getByLabel('Discount (₹)', { exact: true }).blur();
+  await expect(row.getByLabel('Discount (₹)', { exact: true })).toHaveValue('50');
+  await expect(row.getByLabel('Selling price', { exact: true })).toHaveText('₹450');
+  await row.getByRole('button', { name: 'Save price', exact: true }).click();
+  await expect(row.getByRole('status').filter({ hasText: /^Saved$/ })).toHaveText('Saved');
   let updated = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
   expect(updated.base_price).toBe(500);
   expect(updated.discount_value).toBe(50);
@@ -1006,81 +1578,65 @@ test('Prices keeps the list compact and saves whole-rupee discounts in the edito
       original.product_variants[0][field] ?? '',
     );
   expect(updated.product_categories).toEqual(original.product_categories);
-  await open();
-  await choose(page, 'Discount', '% off');
-  await editor.getByLabel('Discount (%)', { exact: true }).fill('12.5');
-  await expect(editor.locator('output')).toHaveText('₹438');
-  await save();
-  await expect(row).toContainText('₹438');
-  await open();
-  await choose(page, 'Discount', 'No discount');
-  await expect(editor.getByRole('button', { name: 'Add discount', exact: true })).toBeVisible();
-  await save();
-  await expect(row).toContainText('₹500');
-  await open();
+  await row.getByLabel('Discount type', { exact: true }).selectOption('percentage');
+  await row.getByLabel('Discount (%)', { exact: true }).fill('12.5');
+  await expect(row.getByLabel('Selling price', { exact: true })).toHaveText('₹438');
+  await row.getByRole('button', { name: 'Save price', exact: true }).click();
+  await expect(row.getByRole('status').filter({ hasText: /^Saved$/ })).toHaveText('Saved');
   await price.fill('999');
-  await editor.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(row).toContainText('₹500');
-  await open();
+  await row.getByRole('button', { name: 'Reset price for Rose lip tint', exact: true }).click();
   await expect(price).toHaveValue('500');
-  await expect(editor.getByRole('button', { name: 'Save changes', exact: true })).toBeDisabled();
-  await editor.getByRole('button', { name: 'Add discount', exact: true }).click();
-  await editor.getByLabel('Discount (%)', { exact: true }).fill('10');
-  await expect(editor.locator('output')).toHaveText('₹450');
-  await editor.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await row.getByLabel('Discount type', { exact: true }).selectOption('none');
+  await row.getByRole('button', { name: 'Save price', exact: true }).click();
+  await expect(row.getByRole('status').filter({ hasText: /^Saved$/ })).toHaveText('Saved');
+  await expect(row.getByLabel('Selling price', { exact: true })).toHaveText('₹500');
   updated = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
   expect(updated.discount_type).toBe('none');
   expect(updated.discount_value).toBe(0);
-  await expect(page.getByLabel('Price (₹)', { exact: true })).toHaveCount(0);
-  await page.evaluate(() => {
-    (document.activeElement as HTMLElement)?.blur();
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  });
-  await page.screenshot({ path: 'test-results/admin-prices-desktop.png', fullPage: true });
   await page.goto('/product/rose-lip-tint');
   await expect(page.locator('.detail-price')).toContainText('₹500');
   await page.goto('/admin/prices?q=not-a-product');
   await expect(page.getByRole('heading', { name: 'No products found', exact: true })).toBeVisible();
 });
 
-test('Prices edits one option at a time on a phone and preserves all variant changes', async ({
+test('Prices groups variants as editable sub-rows and keeps other drafts intact on mobile', async ({
   page,
   context,
   request,
 }) => {
   await request.get('http://127.0.0.1:54329/__gallery');
   await signIn(context, OWNER);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/admin/prices?q=Colour');
-  const row = page.getByRole('article', { name: 'Colour pencil set', exact: true });
-  const editor = page.getByRole('dialog', { name: 'Colour pencil set', exact: true });
-  await expect(page.getByLabel('Price (₹)', { exact: true })).toHaveCount(0);
-  await row.getByRole('button', { name: 'Edit prices for Colour pencil set', exact: true }).click();
-  await expect(editor.getByLabel('Price (₹)', { exact: true })).toHaveCount(1);
-  await choose(page, 'Option', 'Rose');
-  await editor.getByLabel('Price (₹)', { exact: true }).fill('400');
-  await choose(page, 'Discount', '% off');
-  await editor.getByLabel('Discount (%)', { exact: true }).fill('50');
-  await expect(editor.locator('output')).toHaveText('₹200');
-  await choose(page, 'Option', 'Mint');
-  await editor.getByLabel('Price (₹)', { exact: true }).fill('300');
-  await choose(page, 'Discount', 'No discount');
-  await expect(editor.locator('output')).toHaveText('₹300');
-  await choose(page, 'Option', 'Sand');
-  await editor.getByLabel('Price (₹)', { exact: true }).fill('250');
-  await editor.getByLabel('Discount (₹)', { exact: true }).fill('25');
-  await expect(editor.locator('output')).toHaveText('₹225');
-  expect(await editor.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-  await page.screenshot({ path: 'test-results/admin-prices-editor-phone.png', fullPage: true });
-  await editor.getByRole('button', { name: 'Save changes', exact: true }).click();
-  await expect(editor).toHaveCount(0);
-  await expect(row).toContainText('From ₹200');
-  const products = await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json();
-  const saved = products.find((product: { slug: string }) => product.slug === 'colour-pencil-set');
-  expect(saved.has_variants).toBe(true);
-  expect(saved.base_price).toBeNull();
-  expect(saved.discount_type).toBe('none');
-  expect(saved.discount_value).toBe(0);
+  await page.goto('/admin/prices');
+  const table = page.getByRole('table', { name: 'Product prices' });
+  await expect(table.getByRole('link', { name: 'Colour pencil set', exact: true })).toHaveCount(1);
+  const rose = table.getByRole('row', { name: 'Colour pencil set — Rose', exact: true });
+  const mint = table.getByRole('row', { name: 'Colour pencil set — Mint', exact: true });
+  const sand = table.getByRole('row', { name: 'Colour pencil set — Sand', exact: true });
+  await expect(rose).not.toContainText('Colour pencil set');
+  await page.screenshot({ path: 'artifacts/prices-desktop.png', fullPage: true });
+  await mint.getByLabel('Price (₹)', { exact: true }).fill('300');
+  await mint.getByLabel('Discount type', { exact: true }).selectOption('none');
+  await rose.getByLabel('Price (₹)', { exact: true }).fill('400');
+  await rose.getByLabel('Discount type', { exact: true }).selectOption('percentage');
+  await rose.getByLabel('Discount (%)', { exact: true }).fill('50');
+  await expect(rose.getByLabel('Selling price', { exact: true })).toHaveText('₹200');
+  await rose.getByRole('button', { name: 'Save price', exact: true }).click();
+  await expect(rose.getByRole('status').filter({ hasText: /^Saved$/ })).toHaveText('Saved');
+  await expect(mint.getByLabel('Price (₹)', { exact: true })).toHaveValue('300');
+  let saved = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json()).find(
+    (product: { slug: string }) => product.slug === 'colour-pencil-set',
+  );
+  expect(saved.product_variants[1].price).toBe(399);
+  await mint.getByRole('button', { name: 'Save price', exact: true }).click();
+  await expect(mint.getByRole('status').filter({ hasText: /^Saved$/ })).toHaveText('Saved');
+  await sand.getByLabel('Price (₹)', { exact: true }).fill('250');
+  await sand.getByLabel('Discount (₹)', { exact: true }).fill('25');
+  await expect(sand.getByLabel('Selling price', { exact: true })).toHaveText('₹225');
+  await sand.getByRole('button', { name: 'Save price', exact: true }).click();
+  await expect(sand.getByRole('status').filter({ hasText: /^Saved$/ })).toHaveText('Saved');
+  saved = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json()).find(
+    (product: { slug: string }) => product.slug === 'colour-pencil-set',
+  );
   expect(saved.product_variants.map((variant: { price: number }) => variant.price)).toEqual([
     400, 300, 250,
   ]);
@@ -1095,25 +1651,36 @@ test('Prices edits one option at a time on a phone and preserves all variant cha
   expect(
     saved.product_variants.map((variant: { is_default: boolean }) => variant.is_default),
   ).toEqual([true, false, false]);
-  await expect(page.getByLabel('Price (₹)', { exact: true })).toHaveCount(0);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.evaluate(() => {
-    (document.activeElement as HTMLElement)?.blur();
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  });
-  await page.screenshot({ path: 'test-results/admin-prices-phone.png', fullPage: true });
+  await rose.getByLabel('Price (₹)', { exact: true }).fill('');
+  await rose.getByRole('button', { name: 'Save price', exact: true }).click();
+  await expect(rose.getByLabel('Price (₹)', { exact: true })).toHaveValue('');
+  await mint.getByLabel('Price (₹)', { exact: true }).fill('350');
+  await mint.getByRole('button', { name: 'Save price', exact: true }).click();
+  await expect(mint.getByRole('status').filter({ hasText: /^Saved$/ })).toHaveText('Saved');
+  await expect(rose.getByLabel('Price (₹)', { exact: true })).toHaveValue('');
+  await rose
+    .getByRole('button', { name: 'Reset price for Colour pencil set — Rose', exact: true })
+    .click();
+  await expect(rose.getByLabel('Price (₹)', { exact: true })).toHaveValue('400');
+  await page.setViewportSize({ width: 393, height: 852 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.screenshot({ path: 'artifacts/prices-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 320, height: 720 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
 });
 
-test('Prices rejects a stale edit after stock changes and reloads before retrying', async ({
+test('Prices blocks stale price updates after stock changes and refreshes before retrying', async ({
   page,
   context,
   request,
 }) => {
   await signIn(context, OWNER);
   await page.goto('/admin/prices');
-  const row = page.getByRole('article', { name: 'Rose lip tint', exact: true });
-  const editor = page.getByRole('dialog', { name: 'Rose lip tint', exact: true });
-  await row.getByRole('button', { name: 'Edit prices for Rose lip tint', exact: true }).click();
+  const row = page.getByRole('row', { name: 'Rose lip tint', exact: true });
   const snapshot = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
   const variant = snapshot.product_variants[0];
   const stock = await request.post(
@@ -1124,50 +1691,160 @@ test('Prices rejects a stale edit after stock changes and reloads before retryin
     },
   );
   expect(stock.ok()).toBe(true);
-  await editor.getByLabel('Price (₹)', { exact: true }).fill('450');
-  await editor.getByRole('button', { name: 'Save changes', exact: true }).click();
-  await expect(editor.getByRole('alert')).toContainText('Someone changed this record');
-  await expect(editor.getByRole('button', { name: 'Save changes', exact: true })).toBeDisabled();
+  await row.getByLabel('Price (₹)', { exact: true }).fill('450');
+  await row.getByRole('button', { name: 'Save price', exact: true }).click();
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'Someone changed this record' }),
+  ).toBeVisible();
+  await expect(row.getByRole('button', { name: 'Save price', exact: true })).toBeDisabled();
   let saved = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
   expect(saved.base_price).toBe(399);
   expect(saved.product_variants[0].stock).toBe(9);
-  await editor.getByRole('button', { name: 'Refresh prices', exact: true }).click();
-  await expect(editor).toHaveCount(0);
-  await row.getByRole('button', { name: 'Edit prices for Rose lip tint', exact: true }).click();
-  await expect(editor.getByLabel('Price (₹)', { exact: true })).toHaveValue('399');
-  await editor.getByLabel('Price (₹)', { exact: true }).fill('450');
-  await editor.getByRole('button', { name: 'Save changes', exact: true }).click();
-  await expect(editor).toHaveCount(0);
-  await expect(row).toContainText('₹350');
+  await page.getByRole('button', { name: 'Refresh prices', exact: true }).click();
+  await expect(row.getByLabel('Price (₹)', { exact: true })).toHaveValue('399');
+  await row.getByLabel('Price (₹)', { exact: true }).fill('450');
+  await row.getByRole('button', { name: 'Save price', exact: true }).click();
+  await expect(row.getByRole('status').filter({ hasText: /^Saved$/ })).toHaveText('Saved');
   saved = (await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json())[0];
   expect(saved.base_price).toBe(450);
   expect(saved.product_variants[0].stock).toBe(9);
   expect(saved.product_variants[0].sku).toBe('ROSE-01');
 });
 
-test('Prices returns to an unfinished option instead of saving a hidden blank price as zero', async ({
+test('Prices bulk updates selected variants and reports partial conflicts without changing other prices', async ({
   page,
   context,
   request,
 }) => {
   await request.get('http://127.0.0.1:54329/__gallery');
   await signIn(context, OWNER);
-  await page.goto('/admin/prices?q=Colour');
+  await page.goto('/admin/prices');
+  for (const title of ['Rose', 'Mint'])
+    await page
+      .getByRole('checkbox', { name: `Select Colour pencil set — ${title}`, exact: true })
+      .check();
+  const bulk = page.getByRole('form', { name: 'Bulk price update' });
+  await page.setViewportSize({ width: 320, height: 720 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await expect(bulk.getByRole('button', { name: 'Update selected', exact: true })).toBeVisible();
+  await page.screenshot({ path: 'artifacts/prices-bulk-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await bulk.getByLabel('Bulk price (₹)', { exact: true }).fill('600');
+  await bulk.getByRole('button', { name: 'Update selected', exact: true }).click();
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Updated prices for 2 rows.' }),
+  ).toBeVisible();
+  let products = await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json();
+  let saved = products.find((product: { slug: string }) => product.slug === 'colour-pencil-set');
+  expect(saved.product_variants.map((variant: { price: number }) => variant.price)).toEqual([
+    600, 600, 399,
+  ]);
+  expect(
+    products.find((product: { slug: string }) => product.slug === 'rose-lip-tint').base_price,
+  ).toBe(399);
   await page
-    .getByRole('button', { name: 'Edit prices for Colour pencil set', exact: true })
-    .click();
-  const editor = page.getByRole('dialog', { name: 'Colour pencil set', exact: true });
-  await choose(page, 'Option', 'Rose');
-  await editor.getByLabel('Price (₹)', { exact: true }).fill('');
-  await choose(page, 'Option', 'Mint');
-  await editor.getByRole('button', { name: 'Save changes', exact: true }).click();
-  await expect(editor.getByRole('combobox', { name: 'Option', exact: true })).toHaveText('Rose');
-  await expect(editor.getByLabel('Price (₹)', { exact: true })).toHaveValue('');
-  await expect(editor.getByRole('alert')).toContainText('for Rose');
-  const products = await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json();
-  const saved = products.find((product: { slug: string }) => product.slug === 'colour-pencil-set');
-  expect(saved.product_variants[0].price).toBe(399);
-  await editor.getByLabel('Price (₹)', { exact: true }).fill('450');
-  await editor.getByRole('button', { name: 'Save changes', exact: true }).click();
-  await expect(editor).toHaveCount(0);
+    .getByRole('checkbox', { name: 'Select all variants of Colour pencil set', exact: true })
+    .check();
+  await bulk.getByLabel('Bulk update field', { exact: true }).selectOption('discount');
+  await bulk.getByLabel('Bulk discount (%)', { exact: true }).fill('12.5');
+  await bulk.getByRole('button', { name: 'Update selected', exact: true }).click();
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Updated prices for 3 rows.' }),
+  ).toBeVisible();
+  const table = page.getByRole('table', { name: 'Product prices' });
+  await expect(
+    table
+      .getByRole('row', { name: 'Colour pencil set — Rose', exact: true })
+      .getByLabel('Selling price', { exact: true }),
+  ).toHaveText('₹525');
+  await expect(
+    table
+      .getByRole('row', { name: 'Colour pencil set — Sand', exact: true })
+      .getByLabel('Selling price', { exact: true }),
+  ).toHaveText('₹349');
+  products = await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json();
+  saved = products.find((product: { slug: string }) => product.slug === 'colour-pencil-set');
+  expect(
+    saved.product_variants.map((variant: { discount_value: number }) => variant.discount_value),
+  ).toEqual([12.5, 12.5, 12.5]);
+  await page.getByRole('checkbox', { name: 'Select Rose lip tint', exact: true }).check();
+  await page
+    .getByRole('checkbox', { name: 'Select Colour pencil set — Mint', exact: true })
+    .check();
+  const stock = await request.post(
+    'http://127.0.0.1:54329/rest/v1/rpc/storefront_admin_set_stock',
+    {
+      headers: { Authorization: `Bearer ${tokenFor(OWNER)}` },
+      data: {
+        p_variant_id: saved.product_variants[1].id,
+        p_stock: 9,
+        p_expected_updated_at: saved.product_variants[1].updated_at,
+      },
+    },
+  );
+  expect(stock.ok()).toBe(true);
+  await bulk.getByLabel('Bulk update field', { exact: true }).selectOption('price');
+  await bulk.getByLabel('Bulk price (₹)', { exact: true }).fill('500');
+  await bulk.getByRole('button', { name: 'Update selected', exact: true }).click();
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Updated prices for 1 row.' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('alert').filter({ hasText: '1 product was not updated' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('checkbox', { name: 'Select Colour pencil set — Mint', exact: true }),
+  ).toBeChecked();
+  await expect(
+    page.getByRole('checkbox', { name: 'Select Rose lip tint', exact: true }),
+  ).not.toBeChecked();
+  products = await (await request.get('http://127.0.0.1:54329/rest/v1/products')).json();
+  saved = products.find((product: { slug: string }) => product.slug === 'colour-pencil-set');
+  expect(
+    products.find((product: { slug: string }) => product.slug === 'rose-lip-tint').base_price,
+  ).toBe(500);
+  expect(saved.product_variants[1].price).toBe(600);
+  expect(saved.product_variants[1].stock).toBe(9);
+});
+
+test('Prices category and visibility filters match inventory and persist through pagination', async ({
+  page,
+  context,
+  request,
+}) => {
+  await request.get('http://127.0.0.1:54329/__gallery');
+  await request.get('http://127.0.0.1:54329/__inventory/categories');
+  await signIn(context, OWNER);
+  await page.goto('/admin/prices');
+  const category = page.getByRole('combobox', { name: 'Filter by category', exact: true });
+  const table = page.getByRole('table', { name: 'Product prices' });
+  await page.getByRole('checkbox', { name: 'Select all rows on this page', exact: true }).check();
+  await category.selectOption('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(table).toContainText('Colour pencil set');
+  await expect(table).not.toContainText('Rose lip tint');
+  await expect(page.getByRole('button', { name: 'Update selected' })).toHaveCount(0);
+  await category.selectOption('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(table).toContainText('Rose lip tint');
+  await expect(table).toContainText('Colour pencil set');
+  await page
+    .getByRole('combobox', { name: 'Product visibility', exact: true })
+    .selectOption('inactive');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'No products found', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Clear filters', exact: true }).click();
+  await expect(category).toHaveValue('');
+  await request.get('http://127.0.0.1:54329/__inventory/categories/paged');
+  await page.goto(
+    '/admin/prices?category=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb&q=Stationery&status=active',
+  );
+  await expect(table.getByRole('row')).toHaveCount(26);
+  await page.getByRole('link', { name: 'Next', exact: true }).click();
+  await expect(page).toHaveURL(/category=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/);
+  await expect(page).toHaveURL(/status=active/);
+  await expect(page).toHaveURL(/q=Stationery/);
+  await expect(table.getByRole('row')).toHaveCount(6);
 });

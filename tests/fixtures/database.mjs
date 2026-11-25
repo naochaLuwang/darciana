@@ -3,6 +3,7 @@ export async function initializeStoreDatabase(
   db,
   customer = '11111111-1111-4111-8111-111111111111',
   owner = '22222222-2222-4222-8222-222222222222',
+  { fulfilment = true } = {},
 ) {
   await db.exec(`
       create role anon; create role authenticated; create schema auth; create schema storage;
@@ -28,6 +29,10 @@ export async function initializeStoreDatabase(
     `);
   await db.exec(await readFile(new URL('../../supabase/setup.sql', import.meta.url), 'utf8'));
   await db.exec(await readFile(new URL('../../supabase/admin-setup.sql', import.meta.url), 'utf8'));
+  if (fulfilment)
+    await db.exec(
+      await readFile(new URL('../../supabase/order-fulfilment-setup.sql', import.meta.url), 'utf8'),
+    );
   await db.exec(
     await readFile(new URL('../../supabase/product-delete-setup.sql', import.meta.url), 'utf8'),
   );

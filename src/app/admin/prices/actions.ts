@@ -53,3 +53,31 @@ export async function savePrices(input: unknown): Promise<PricingResult> {
     return { success: 'Prices saved. Refresh before making more changes.', refreshRequired: true };
   return { success: 'Prices saved.', record: productPricing(normalizeAdminProduct(updated.data)) };
 }
+export async function saveBulkPrices(input: unknown): Promise<{
+  results: (PricingResult & { id: string })[];
+  error?: string;
+}> {
+  const parsed = pricingSchema.array().min(1).max(25).safeParse(input);
+  if (!parsed.success) return { results: [], error: parsed.error.issues[0].message };
+  if (new Set(parsed.data.map((product) => product.id)).size !== parsed.data.length)
+    return { results: [], error: 'Each product must appear once.' };
+  const session = await adminSession();
+  if (!session) return { results: [], error: 'Admin access is required. Sign in again.' };
+  const results: (PricingResult & { id: string })[] = [];
+  for (let offset = 0; offset < parsed.data.length; offset += 5) {
+    const batch = parsed.data.slice(offset, offset + 5);
+    const saved = await Promise.allSettled(batch.map((product) => savePrices(product)));
+    saved.forEach((result, index) =>
+      results.push({
+        id: batch[index].id,
+        ...(result.status === 'fulfilled'
+          ? result.value
+          : {
+              error: 'Could not confirm this update. Refresh prices before trying again.',
+              refreshRequired: true,
+            }),
+      }),
+    );
+  }
+  return { results };
+}

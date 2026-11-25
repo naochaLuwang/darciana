@@ -14,6 +14,7 @@ import { pushError } from '@/lib/push';
 import { AdminHeading, AdminNotice, adminDate } from '@/components/admin/common';
 import { NotificationHistory } from '@/components/admin/notification-history';
 import { NotificationEditor } from '@/components/admin/notification-editor';
+import { orderStatusLabel } from '@/lib/order-status';
 import { resendConfig } from '@/lib/resend-server';
 import Link from 'next/link';
 
@@ -36,7 +37,7 @@ export default async function NotificationsPage() {
           .limit(30),
         db
           .from('storefront_email_deliveries')
-          .select('id,order_id,order_status,status,failure_reason,created_at')
+          .select('id,order_id,order_status,audience,status,failure_reason,created_at')
           .order('created_at', { ascending: false })
           .limit(30),
       ])
@@ -119,6 +120,7 @@ export default async function NotificationsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Order</TableHead>
+                      <TableHead>Recipient</TableHead>
                       <TableHead>Update</TableHead>
                       <TableHead>Email status</TableHead>
                       <TableHead>Date</TableHead>
@@ -136,7 +138,8 @@ export default async function NotificationsPage() {
                             'Deleted order'
                           )}
                         </TableCell>
-                        <TableCell>{row.order_status.replaceAll('_', ' ')}</TableCell>
+                        <TableCell>{row.audience === 'admin' ? 'Admin' : 'Customer'}</TableCell>
+                        <TableCell>{orderStatusLabel(row.order_status)}</TableCell>
                         <TableCell>
                           {row.status === 'sent'
                             ? 'Accepted by Resend'

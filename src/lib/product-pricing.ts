@@ -3,7 +3,7 @@ import type { AdminProduct } from './admin';
 import { productSchema, type ProductInput } from './admin-validation.ts';
 import { roundRupees } from './money.ts';
 
-const optionPriceSchema = z
+export const optionPriceSchema = z
   .object({
     id: z.uuid(),
     price: z.number().finite().int('Use whole rupees.').min(0).max(1000000),

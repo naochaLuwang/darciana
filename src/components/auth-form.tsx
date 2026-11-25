@@ -4,16 +4,18 @@ import Link from 'next/link';
 import { StoreImage as Image } from '@/components/store-image';
 import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { authenticate, signInWithGoogle, type AuthState } from '@/app/auth/actions';
+import { AppleSignIn } from '@/components/apple-sign-in';
 export function AuthForm({ next = '' }: { next?: string }) {
   const [mode, setMode] = useState('login');
   const [showPassword, setShowPassword] = useState(false);
+  const [applePending, setApplePending] = useState(false);
   const passwordId = useId();
   const [state, action, pending] = useActionState<AuthState, FormData>(authenticate, {});
   const [googleState, googleAction, googlePending] = useActionState<AuthState, FormData>(
     signInWithGoogle,
     {},
   );
-  const busy = pending || googlePending;
+  const busy = pending || googlePending || applePending;
   return (
     <div className="auth-card">
       <header className="auth-intro">
@@ -31,6 +33,7 @@ export function AuthForm({ next = '' }: { next?: string }) {
         {next === 'checkout' ? <p>Sign in to checkout.</p> : null}
       </header>
       <div className="auth-form-panel">
+        <AppleSignIn next={next} disabled={busy} onPendingChange={setApplePending} />
         <form action={googleAction} className="google-sign-in-form">
           <input type="hidden" name="next" value={next} />
           <button className="button google-sign-in" disabled={busy}>
