@@ -165,8 +165,23 @@ test('admins receive private, independently deduplicated emails even without a v
   assert.equal(state.sent.length, 1);
   state.order.status = 'processing';
   await handleOrderEmail(request({ order_id: orderId, status: 'processing' }), deps);
+  assert.equal(state.sent.length, 1);
+});
+test('admins are alerted for new orders but not later status changes', async () => {
+  const { state, deps } = fixture();
+  state.admins = [{ user_id: '22222222-2222-4222-8222-222222222222', email: 'admin@example.com' }];
+  await handleOrderEmail(request(), deps);
   assert.equal(state.sent.length, 2);
-  assert.match(state.sent[1].subject, /Order processing/);
+  assert.deepEqual(
+    state.sent.map((email) => email.to).sort(),
+    ['admin@example.com', 'customer@example.com'],
+  );
+  for (const status of ['processing', 'shipped', 'out_for_delivery', 'delivered']) {
+    state.order.status = status;
+    await handleOrderEmail(request({ order_id: orderId, status }), deps);
+  }
+  assert.equal(state.sent.length, 6);
+  assert.ok(state.sent.slice(2).every((email) => email.to === 'customer@example.com'));
 });
 test('customer and multiple admin outcomes are isolated; retries never resend an accepted email', async () => {
   const { state, deps } = fixture();

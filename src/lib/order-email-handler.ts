@@ -98,24 +98,30 @@ export async function handleOrderEmail(request: Request, { db, secret, send }: D
       return 'failed';
     }
   }
+  // Admins are alerted only for new order requests, never later status changes.
   // Recipient discovery failures must not prevent the customer receipt.
   let adminLookupFailed = false;
-  const lookupAdmins = await database.rpc('storefront_order_email_admins').then(
-    (result) => {
-      const parsed = z
-        .array(z.object({ user_id: z.uuid(), email: z.string() }))
-        .safeParse(result.data);
-      if (result.error || !parsed.success) {
-        adminLookupFailed = true;
-        return [];
-      }
-      return [...new Map(parsed.data.map((recipient) => [recipient.user_id, recipient])).values()];
-    },
-    () => {
-      adminLookupFailed = true;
-      return [];
-    },
-  );
+  const lookupAdmins =
+    order.status === 'awaiting_confirmation'
+      ? await database.rpc('storefront_order_email_admins').then(
+          (result) => {
+            const parsed = z
+              .array(z.object({ user_id: z.uuid(), email: z.string() }))
+              .safeParse(result.data);
+            if (result.error || !parsed.success) {
+              adminLookupFailed = true;
+              return [];
+            }
+            return [
+              ...new Map(parsed.data.map((recipient) => [recipient.user_id, recipient])).values(),
+            ];
+          },
+          () => {
+            adminLookupFailed = true;
+            return [];
+          },
+        )
+      : [];
   const tasks = [
     () => deliver('customer'),
     ...lookupAdmins.map((admin) => () => deliver('admin', admin)),
